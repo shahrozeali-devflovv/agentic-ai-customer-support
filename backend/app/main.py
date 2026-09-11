@@ -1,15 +1,16 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-
 from app.database import check_database_connection
+from app.db.session import get_db
+from app.routers.auth import router as auth_router
+
 
 app = FastAPI()
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,9 +21,15 @@ app.add_middleware(
 )
 
 
+app.include_router(auth_router)
+
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+    }
+
 
 @app.get("/sqlalchemy-health")
 def sqlalchemy_health_check(
@@ -35,6 +42,8 @@ def sqlalchemy_health_check(
         "database": "connected",
         "result": result,
     }
+
+
 @app.get("/db-health")
 def database_health_check():
     if check_database_connection():
