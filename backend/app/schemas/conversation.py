@@ -1,0 +1,22 @@
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.models.conversation import ConversationStatus
+
+
+class ConversationCreate(BaseModel):
+    title: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+
+class ConversationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str | None
+    status: ConversationStatus
+    created_at: datetime
+    updated_at: datetime

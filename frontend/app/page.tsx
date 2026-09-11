@@ -1,320 +1,256 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-
-type User = {
-  id: number;
-  email: string;
-  full_name: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
 
 export default function Home() {
-  const [backendStatus, setBackendStatus] = useState("Checking...");
+  const router = useRouter();
 
-  const [registerEmail, setRegisterEmail] = useState("");
-  const [registerPassword, setRegisterPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-
-  const [accessToken, setAccessToken] = useState("");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-  useEffect(() => {
-    async function checkBackend() {
-      try {
-        const response = await fetch(`${apiUrl}/health`);
-
-        if (!response.ok) {
-          throw new Error("Backend request failed");
-        }
-
-        const data = await response.json();
-        setBackendStatus(data.status);
-      } catch (error) {
-        console.error(error);
-        setBackendStatus("unavailable");
-      }
-    }
-
-    checkBackend();
-  }, [apiUrl]);
-
-  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+  async function handleLogin(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
+
     setMessage("");
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${apiUrl}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${apiUrl}/auth/login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
         },
-        body: JSON.stringify({
-          email: registerEmail,
-          password: registerPassword,
-          full_name: fullName,
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Registration failed");
+        throw new Error(
+          data.detail || "Login failed",
+        );
       }
 
-      setMessage(`Registered successfully: ${data.email}`);
+      localStorage.setItem(
+        "access_token",
+        data.access_token,
+      );
 
-      setRegisterEmail("");
-      setRegisterPassword("");
-      setFullName("");
+      router.push("/dashboard");
     } catch (error) {
       if (error instanceof Error) {
         setMessage(error.message);
       }
+    } finally {
+      setIsSubmitting(false);
     }
-  }
-
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-
-    try {
-      const response = await fetch(`${apiUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: loginEmail,
-          password: loginPassword,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Login failed");
-      }
-
-      setAccessToken(data.access_token);
-      setCurrentUser(null);
-
-      setMessage("Login successful. JWT received.");
-    } catch (error) {
-      if (error instanceof Error) {
-        setMessage(error.message);
-      }
-    }
-  }
-
-  async function handleGetCurrentUser() {
-    if (!accessToken) {
-      setMessage("Please login first.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${apiUrl}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Could not retrieve user");
-      }
-
-      setCurrentUser(data);
-      setMessage("Current user retrieved successfully.");
-    } catch (error) {
-      if (error instanceof Error) {
-        setMessage(error.message);
-      }
-    }
-  }
-
-  function handleLogout() {
-    setAccessToken("");
-    setCurrentUser(null);
-    setMessage("Logged out from the testing UI.");
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8 text-gray-900">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">
-            Agentic AI Customer Support
-          </h1>
+    <main className="min-h-screen bg-soft-white">
+      <div className="grid min-h-screen lg:grid-cols-2">
+        <section className="flex items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
+          <div className="w-full max-w-md">
+            <div className="mb-10">
+              <div className="mb-6 inline-flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-dark-green text-lg font-bold text-white">
+                  A
+                </div>
 
-          <p className="mt-2 text-gray-600">
-            Authentication Development UI
-          </p>
+                <span className="text-lg font-semibold text-text-primary">
+                  Agentic Support
+                </span>
+              </div>
 
-          <p className="mt-2">
-            Backend status:{" "}
-            <span className="font-semibold">
-              {backendStatus}
-            </span>
-          </p>
-        </div>
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-dark-green">
+                Welcome back
+              </p>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <section className="rounded-xl bg-white p-6 shadow">
-            <h2 className="mb-4 text-xl font-semibold">
-              Register
-            </h2>
+              <h1 className="text-4xl font-bold tracking-tight text-text-primary sm:text-5xl">
+                Sign in to your account
+              </h1>
 
-            <form
-              onSubmit={handleRegister}
-              className="space-y-4"
-            >
-              <input
-                type="text"
-                placeholder="Full name"
-                value={fullName}
-                onChange={(event) =>
-                  setFullName(event.target.value)
-                }
-                className="w-full rounded border p-3"
-                required
-              />
-
-              <input
-                type="email"
-                placeholder="Email"
-                value={registerEmail}
-                onChange={(event) =>
-                  setRegisterEmail(event.target.value)
-                }
-                className="w-full rounded border p-3"
-                required
-              />
-
-              <input
-                type="password"
-                placeholder="Password"
-                value={registerPassword}
-                onChange={(event) =>
-                  setRegisterPassword(event.target.value)
-                }
-                className="w-full rounded border p-3"
-                required
-              />
-
-              <button
-                type="submit"
-                className="w-full rounded bg-black p-3 text-white"
-              >
-                Register
-              </button>
-            </form>
-          </section>
-
-          <section className="rounded-xl bg-white p-6 shadow">
-            <h2 className="mb-4 text-xl font-semibold">
-              Login
-            </h2>
+              <p className="mt-4 leading-7 text-text-secondary">
+                Access your orders, support conversations,
+                and account information from one place.
+              </p>
+            </div>
 
             <form
               onSubmit={handleLogin}
-              className="space-y-4"
+              className="space-y-5"
             >
-              <input
-                type="email"
-                placeholder="Email"
-                value={loginEmail}
-                onChange={(event) =>
-                  setLoginEmail(event.target.value)
-                }
-                className="w-full rounded border p-3"
-                required
-              />
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-semibold text-text-primary"
+                >
+                  Email address
+                </label>
 
-              <input
-                type="password"
-                placeholder="Password"
-                value={loginPassword}
-                onChange={(event) =>
-                  setLoginPassword(event.target.value)
-                }
-                className="w-full rounded border p-3"
-                required
-              />
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
+                  placeholder="you@example.com"
+                  required
+                  className="w-full rounded-xl border border-border-soft bg-white px-4 py-3.5 text-text-primary outline-none transition focus:border-dark-green focus:ring-2 focus:ring-dark-green/10"
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label
+                    htmlFor="password"
+                    className="text-sm font-semibold text-text-primary"
+                  >
+                    Password
+                  </label>
+
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-dark-green transition hover:text-deep-green"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  placeholder="Enter your password"
+                  required
+                  className="w-full rounded-xl border border-border-soft bg-white px-4 py-3.5 text-text-primary outline-none transition focus:border-dark-green focus:ring-2 focus:ring-dark-green/10"
+                />
+              </div>
+
+              {message && (
+                <div className="rounded-xl bg-soft-yellow px-4 py-3 text-sm font-medium text-text-primary">
+                  {message}
+                </div>
+              )}
 
               <button
                 type="submit"
-                className="w-full rounded bg-black p-3 text-white"
+                disabled={isSubmitting}
+                className="w-full rounded-xl bg-dark-green px-5 py-3.5 font-semibold text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Login
+                {isSubmitting
+                  ? "Signing in..."
+                  : "Sign in"}
               </button>
             </form>
 
-            <div className="mt-4 flex gap-3">
-              <button
-                onClick={handleGetCurrentUser}
-                className="rounded bg-blue-600 px-4 py-2 text-white"
-              >
-                Get My Profile
-              </button>
+            <div className="my-7 flex items-center gap-4">
+              <div className="h-px flex-1 bg-border-soft" />
 
-              <button
-                onClick={handleLogout}
-                className="rounded bg-gray-600 px-4 py-2 text-white"
-              >
-                Logout
-              </button>
+              <span className="text-sm text-text-secondary">
+                or
+              </span>
+
+              <div className="h-px flex-1 bg-border-soft" />
             </div>
-          </section>
-        </div>
 
-        {message && (
-          <section className="mt-6 rounded-xl bg-white p-5 shadow">
-            <h2 className="font-semibold">
-              API Result
-            </h2>
+            <button
+              type="button"
+              className="w-full rounded-xl border border-border-soft bg-white px-5 py-3.5 font-semibold text-text-primary transition hover:border-dark-green"
+            >
+              Continue with Google
+            </button>
 
-            <p className="mt-2">
-              {message}
+            <p className="mt-8 text-center text-sm text-text-secondary">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/register"
+                className="font-semibold text-dark-green hover:text-deep-green"
+              >
+                Create account
+              </Link>
             </p>
-          </section>
-        )}
+          </div>
+        </section>
 
-        {currentUser && (
-          <section className="mt-6 rounded-xl bg-white p-5 shadow">
-            <h2 className="mb-3 text-xl font-semibold">
-              Current User
-            </h2>
+        <section className="hidden p-6 lg:block">
+          <div className="relative flex h-full overflow-hidden rounded-[32px] bg-dark-green p-12 text-white">
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-yellow opacity-20" />
 
-            <pre className="overflow-auto rounded bg-gray-900 p-4 text-sm text-white">
-              {JSON.stringify(currentUser, null, 2)}
-            </pre>
-          </section>
-        )}
+            <div className="absolute bottom-10 right-10 h-36 w-36 rounded-full border-[24px] border-yellow/20" />
 
-        {accessToken && (
-          <section className="mt-6 rounded-xl bg-white p-5 shadow">
-            <h2 className="mb-3 text-xl font-semibold">
-              JWT Access Token
-            </h2>
+            <div className="relative z-10 flex w-full flex-col justify-between">
+              <div>
+                <div className="inline-flex rounded-full bg-yellow px-4 py-2 text-sm font-bold text-dark-green">
+                  Smart support platform
+                </div>
 
-            <p className="break-all rounded bg-gray-100 p-3 text-sm">
-              {accessToken}
-            </p>
-          </section>
-        )}
+                <h2 className="mt-8 max-w-xl text-5xl font-bold leading-tight tracking-tight">
+                  Support that works
+                  <span className="text-yellow">
+                    {" "}smarter.
+                  </span>
+                </h2>
+
+                <p className="mt-6 max-w-lg text-lg leading-8 text-white/70">
+                  Get fast answers, track your orders,
+                  manage conversations, and reach human
+                  support when you need it.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/10 p-6 backdrop-blur">
+                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-yellow text-xl text-dark-green">
+                    ✓
+                  </div>
+
+                  <h3 className="text-lg font-semibold">
+                    Track your orders
+                  </h3>
+
+                  <p className="mt-2 text-sm leading-6 text-white/65">
+                    Find your latest order status and
+                    delivery information quickly.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/10 p-6 backdrop-blur">
+                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-yellow text-xl text-dark-green">
+                    ✦
+                  </div>
+
+                  <h3 className="text-lg font-semibold">
+                    Get support faster
+                  </h3>
+
+                  <p className="mt-2 text-sm leading-6 text-white/65">
+                    Keep your conversations organized
+                    and access support from one place.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );
