@@ -40,3 +40,4 @@ PyMuPDF==1.26.4
 pgvector==0.5.0
 google-genai
 groq
+langgraph
