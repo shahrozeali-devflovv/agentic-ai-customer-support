@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agent.graph import build_agent_graph
 from app.db.session import get_db
 from app.dependencies.auth import (
     get_current_user,
@@ -10,12 +11,17 @@ from app.dependencies.auth import (
 )
 from app.models.escalation import Escalation
 from app.models.user import User, UserRole
-from app.schemas.message import MessageCreate, MessageResponse
+from app.schemas.message import (
+    AgentMessageResponse,
+    MessageCreate,
+    MessageResponse,
+)
 from app.services.conversation_service import (
     get_conversation_by_id,
     get_conversation_for_user,
 )
 from app.services.message_service import (
+    create_ai_message,
     create_customer_message,
     create_support_message,
     get_messages_for_conversation,
@@ -45,7 +51,7 @@ def support_has_access_to_conversation(
 
 @router.post(
     "",
-    response_model=MessageResponse,
+    response_model=AgentMessageResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def send_message(
@@ -53,7 +59,7 @@ def send_message(
     message_data: MessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> MessageResponse:
+) -> AgentMessageResponse:
     conversation = get_conversation_for_user(
         db=db,
         conversation_id=conversation_id,
@@ -66,11 +72,45 @@ def send_message(
             detail="Conversation not found",
         )
 
-    return create_customer_message(
+    customer_message = create_customer_message(
         db=db,
         conversation_id=conversation_id,
         user_id=current_user.id,
         content=message_data.content,
+    )
+
+    agent_graph = build_agent_graph(
+        db=db,
+    )
+
+    agent_result = agent_graph.invoke(
+        {
+            "message": message_data.content,
+            "user_id": current_user.id,
+        }
+    )
+
+    agent_answer = agent_result.get(
+        "answer"
+    )
+
+    ai_message = None
+
+    if agent_answer:
+        ai_message = create_ai_message(
+            db=db,
+            conversation_id=conversation_id,
+            content=agent_answer,
+        )
+
+    orders = agent_result.get(
+        "orders"
+    )
+
+    return AgentMessageResponse(
+        customer_message=customer_message,
+        ai_message=ai_message,
+        orders=orders,
     )
 
 

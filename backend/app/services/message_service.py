@@ -1,7 +1,10 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.message import Message, MessageSenderType
+from app.models.message import (
+    Message,
+    MessageSenderType,
+)
 
 
 def create_customer_message(
@@ -14,6 +17,25 @@ def create_customer_message(
         conversation_id=conversation_id,
         sender_type=MessageSenderType.CUSTOMER,
         sender_user_id=user_id,
+        content=content,
+    )
+
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    return message
+
+
+def create_ai_message(
+    db: Session,
+    conversation_id: int,
+    content: str,
+) -> Message:
+    message = Message(
+        conversation_id=conversation_id,
+        sender_type=MessageSenderType.AI,
+        sender_user_id=None,
         content=content,
     )
 

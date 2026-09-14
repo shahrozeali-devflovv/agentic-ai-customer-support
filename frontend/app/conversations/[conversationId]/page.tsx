@@ -30,10 +30,28 @@ type Conversation = {
 type Message = {
   id: number;
   conversation_id: number;
-  sender_type: "customer" | "ai" | "support";
-  sender_user_id: number | null;
+  sender_type:
+    | "customer"
+    | "ai"
+    | "support";
   content: string;
   created_at: string;
+};
+
+type AgentOrder = {
+  order_number: string | null;
+  status: string | null;
+  total_amount: string | null;
+  currency: string | null;
+  placed_at: string | null;
+  estimated_delivery_at: string | null;
+  delivered_at: string | null;
+};
+
+type AgentMessageResponse = {
+  customer_message: Message;
+  ai_message: Message | null;
+  orders: AgentOrder[] | null;
 };
 
 export default function CustomerConversationPage() {
@@ -63,6 +81,10 @@ export default function CustomerConversationPage() {
 
   const [messageText, setMessageText] =
     useState("");
+
+  const [orders, setOrders] = useState<
+    AgentOrder[]
+  >([]);
 
   const [isDataLoading, setIsDataLoading] =
     useState(false);
@@ -104,11 +126,18 @@ export default function CustomerConversationPage() {
           ),
         ]);
 
-        setConversation(conversationData);
-        setMessages(messageData);
+        setConversation(
+          conversationData,
+        );
+
+        setMessages(
+          messageData,
+        );
       } catch (error) {
         if (error instanceof Error) {
-          setError(error.message);
+          setError(
+            error.message,
+          );
         }
       } finally {
         setIsDataLoading(false);
@@ -122,16 +151,16 @@ export default function CustomerConversationPage() {
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [messages, orders]);
 
-  async function handleSendMessage(
-    event: FormEvent<HTMLFormElement>,
+  async function sendMessage(
+    content: string,
   ) {
-    event.preventDefault();
-
-    const content = messageText.trim();
-
-    if (!token || !content) {
+    if (
+      !token ||
+      !content.trim() ||
+      isSending
+    ) {
       return;
     }
 
@@ -139,35 +168,75 @@ export default function CustomerConversationPage() {
     setError("");
 
     try {
-      const newMessage =
-        await apiRequest<Message>(
+      const response =
+        await apiRequest<AgentMessageResponse>(
           `/conversations/${conversationId}/messages`,
           {
             method: "POST",
             token,
             body: JSON.stringify({
-              content,
+              content: content.trim(),
             }),
           },
         );
 
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        newMessage,
-      ]);
+      setMessages(
+        (currentMessages) => {
+          const newMessages = [
+            ...currentMessages,
+            response.customer_message,
+          ];
+
+          if (response.ai_message) {
+            newMessages.push(
+              response.ai_message,
+            );
+          }
+
+          return newMessages;
+        },
+      );
+
+      setOrders(
+        response.orders ?? [],
+      );
 
       setMessageText("");
     } catch (error) {
       if (error instanceof Error) {
-        setError(error.message);
+        setError(
+          error.message,
+        );
       }
     } finally {
       setIsSending(false);
     }
   }
 
-  function formatTime(value: string) {
-    return new Date(value).toLocaleTimeString(
+  async function handleSendMessage(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    await sendMessage(
+      messageText,
+    );
+  }
+
+  async function handleOrderSelect(
+    orderNumber: string,
+  ) {
+    await sendMessage(
+      `Tell me the details of order ${orderNumber}`,
+    );
+  }
+
+  function formatTime(
+    value: string,
+  ) {
+    return new Date(
+      value,
+    ).toLocaleTimeString(
       "en-US",
       {
         hour: "numeric",
@@ -176,8 +245,12 @@ export default function CustomerConversationPage() {
     );
   }
 
-  function formatDate(value: string) {
-    return new Date(value).toLocaleString(
+  function formatDate(
+    value: string,
+  ) {
+    return new Date(
+      value,
+    ).toLocaleString(
       "en-US",
       {
         year: "numeric",
@@ -189,8 +262,28 @@ export default function CustomerConversationPage() {
     );
   }
 
+  function formatOrderDate(
+    value: string | null,
+  ) {
+    if (!value) {
+      return null;
+    }
+
+    return new Date(
+      value,
+    ).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      },
+    );
+  }
+
   function getSenderLabel(
-    senderType: Message["sender_type"],
+    senderType:
+      Message["sender_type"],
   ) {
     switch (senderType) {
       case "customer":
@@ -225,7 +318,34 @@ export default function CustomerConversationPage() {
     }
   }
 
-  if (isAuthLoading || !user) {
+  function getOrderStatusClasses(
+    status: string | null,
+  ) {
+    switch (status) {
+      case "delivered":
+        return "bg-light-green text-dark-green";
+
+      case "shipped":
+        return "bg-soft-yellow text-dark-green";
+
+      case "processing":
+        return "bg-blue-50 text-blue-700";
+
+      case "pending":
+        return "bg-gray-100 text-gray-700";
+
+      case "cancelled":
+        return "bg-red-50 text-red-700";
+
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  }
+
+  if (
+    isAuthLoading ||
+    !user
+  ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-soft-white">
         <p className="text-text-secondary">
@@ -249,7 +369,9 @@ export default function CustomerConversationPage() {
           onMenuClick={() =>
             setIsSidebarOpen(true)
           }
-          userName={user.full_name}
+          userName={
+            user.full_name
+          }
         />
 
         <div className="px-4 py-5 sm:px-6 lg:px-8">
@@ -299,13 +421,17 @@ export default function CustomerConversationPage() {
                               conversation.status,
                             )}`}
                           >
-                            {conversation.status}
+                            {
+                              conversation.status
+                            }
                           </span>
                         </div>
 
                         <p className="mt-2 text-sm text-text-secondary">
                           Conversation #
-                          {conversation.id}
+                          {
+                            conversation.id
+                          }
                         </p>
 
                         <p className="mt-1 text-xs text-text-secondary">
@@ -318,8 +444,9 @@ export default function CustomerConversationPage() {
                     </div>
                   </div>
 
-                  <div className="max-h-[470px] min-h-[280px] overflow-y-auto bg-soft-white px-4 py-5 sm:px-6">
-                    {messages.length === 0 ? (
+                  <div className="max-h-[560px] min-h-[320px] overflow-y-auto bg-soft-white px-4 py-5 sm:px-6">
+                    {messages.length ===
+                    0 ? (
                       <div className="flex min-h-[240px] items-center justify-center">
                         <div className="max-w-md text-center">
                           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow text-2xl">
@@ -327,12 +454,14 @@ export default function CustomerConversationPage() {
                           </div>
 
                           <h2 className="mt-4 text-lg font-bold text-text-primary">
-                            No messages yet
+                            Start a conversation
                           </h2>
 
                           <p className="mt-2 text-sm text-text-secondary">
-                            Send your first message
-                            below.
+                            Ask about your
+                            orders, refunds,
+                            returns, or other
+                            support questions.
                           </p>
                         </div>
                       </div>
@@ -350,7 +479,9 @@ export default function CustomerConversationPage() {
 
                             return (
                               <div
-                                key={message.id}
+                                key={
+                                  message.id
+                                }
                                 className={`flex ${
                                   isCustomer
                                     ? "justify-end"
@@ -387,7 +518,9 @@ export default function CustomerConversationPage() {
                                           : "rounded-bl-md bg-soft-yellow text-text-primary"
                                     }`}
                                   >
-                                    {message.content}
+                                    {
+                                      message.content
+                                    }
                                   </div>
                                 </div>
                               </div>
@@ -395,8 +528,133 @@ export default function CustomerConversationPage() {
                           },
                         )}
 
+                        {orders.length >
+                          0 && (
+                          <div className="flex justify-start">
+                            <div className="w-full max-w-2xl">
+                              <p className="mb-2 text-xs font-semibold text-text-secondary">
+                                Your orders
+                              </p>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {orders.map(
+                                  (
+                                    order,
+                                  ) => {
+                                    if (
+                                      !order.order_number
+                                    ) {
+                                      return null;
+                                    }
+
+                                    return (
+                                      <button
+                                        key={
+                                          order.order_number
+                                        }
+                                        type="button"
+                                        disabled={
+                                          isSending
+                                        }
+                                        onClick={() =>
+                                          handleOrderSelect(
+                                            order.order_number as string,
+                                          )
+                                        }
+                                        className="rounded-2xl border border-border-soft bg-white p-4 text-left shadow-sm transition hover:border-dark-green hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <p className="font-bold text-text-primary">
+                                              {
+                                                order.order_number
+                                              }
+                                            </p>
+
+                                            {order.total_amount &&
+                                              order.currency && (
+                                                <p className="mt-1 text-sm text-text-secondary">
+                                                  {
+                                                    order.currency
+                                                  }{" "}
+                                                  {
+                                                    order.total_amount
+                                                  }
+                                                </p>
+                                              )}
+                                          </div>
+
+                                          <span
+                                            className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${getOrderStatusClasses(
+                                              order.status,
+                                            )}`}
+                                          >
+                                            {order.status ||
+                                              "Unknown"}
+                                          </span>
+                                        </div>
+
+                                        <div className="mt-3 space-y-1 text-xs text-text-secondary">
+                                          {order.placed_at && (
+                                            <p>
+                                              Placed:{" "}
+                                              {formatOrderDate(
+                                                order.placed_at,
+                                              )}
+                                            </p>
+                                          )}
+
+                                          {order.estimated_delivery_at && (
+                                            <p>
+                                              Estimated
+                                              delivery:{" "}
+                                              {formatOrderDate(
+                                                order.estimated_delivery_at,
+                                              )}
+                                            </p>
+                                          )}
+
+                                          {order.delivered_at && (
+                                            <p>
+                                              Delivered:{" "}
+                                              {formatOrderDate(
+                                                order.delivered_at,
+                                              )}
+                                            </p>
+                                          )}
+                                        </div>
+
+                                        <p className="mt-3 text-xs font-bold text-dark-green">
+                                          View order
+                                          details →
+                                        </p>
+                                      </button>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {isSending && (
+                          <div className="flex justify-start">
+                            <div>
+                              <p className="mb-1 text-xs font-semibold text-text-secondary">
+                                AI Support
+                              </p>
+
+                              <div className="rounded-2xl rounded-bl-md border border-border-soft bg-white px-4 py-3 text-sm text-text-secondary">
+                                Thinking...
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div
-                          ref={messagesEndRef}
+                          ref={
+                            messagesEndRef
+                          }
                         />
                       </div>
                     )}
@@ -409,7 +667,9 @@ export default function CustomerConversationPage() {
                   )}
 
                   <form
-                    onSubmit={handleSendMessage}
+                    onSubmit={
+                      handleSendMessage
+                    }
                     className="border-t border-border-soft bg-white p-4 sm:p-5"
                   >
                     <label
@@ -421,15 +681,22 @@ export default function CustomerConversationPage() {
 
                     <textarea
                       id="customer-message"
-                      value={messageText}
-                      onChange={(event) =>
+                      value={
+                        messageText
+                      }
+                      onChange={(
+                        event,
+                      ) =>
                         setMessageText(
-                          event.target.value,
+                          event.target
+                            .value,
                         )
                       }
                       rows={3}
-                      placeholder="Type your message..."
-                      disabled={isSending}
+                      placeholder="Ask about an order, refund, return, or another support question..."
+                      disabled={
+                        isSending
+                      }
                       className="min-h-[90px] w-full resize-y rounded-xl border border-border-soft bg-white px-4 py-3 text-sm text-text-primary outline-none transition placeholder:text-text-secondary focus:border-dark-green focus:ring-2 focus:ring-dark-green/10 disabled:cursor-not-allowed disabled:bg-gray-100"
                     />
 
@@ -443,7 +710,7 @@ export default function CustomerConversationPage() {
                         className="w-full rounded-xl bg-dark-green px-5 py-3 text-sm font-bold text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                       >
                         {isSending
-                          ? "Sending..."
+                          ? "AI is thinking..."
                           : "Send message"}
                       </button>
                     </div>

@@ -33,9 +33,9 @@ def extract_order_number(
         return None
 
     match = re.search(
-        r"\bORD-\d+\b",
-        cleaned_message,
-        re.IGNORECASE,
+    r"\bORD-(?:[A-Z]+-)?\d+\b",
+    cleaned_message,
+    re.IGNORECASE,
     )
 
     if match is None:
