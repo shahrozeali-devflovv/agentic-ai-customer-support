@@ -7,6 +7,9 @@ from app.models.knowledge_document import (
 from app.services.document_extraction_service import (
     extract_text_from_pdf,
 )
+from app.services.embedding_service import (
+    generate_embeddings,
+)
 from app.services.knowledge_chunk_service import (
     replace_knowledge_chunks,
 )
@@ -56,13 +59,20 @@ def process_knowledge_document(
                 "No chunks could be created from the document"
             )
 
+        embeddings = generate_embeddings(
+            texts=chunks,
+        )
+
         replace_knowledge_chunks(
             db=db,
             knowledge_document_id=document.id,
             chunks=chunks,
+            embeddings=embeddings,
         )
 
-        document.status = KnowledgeDocumentStatus.READY
+        document.status = (
+            KnowledgeDocumentStatus.READY
+        )
 
         db.add(document)
         db.commit()
@@ -82,7 +92,9 @@ def process_knowledge_document(
             update_knowledge_document_status(
                 db=db,
                 document=failed_document,
-                new_status=KnowledgeDocumentStatus.FAILED,
+                new_status=(
+                    KnowledgeDocumentStatus.FAILED
+                ),
             )
 
         raise

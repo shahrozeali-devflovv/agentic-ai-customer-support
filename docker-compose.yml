@@ -31,6 +31,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
       - knowledge_base_storage:/app/storage/knowledge-base
     depends_on:
@@ -51,6 +52,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       FRONTEND_URL: ${FRONTEND_URL}
+      
     depends_on:
       - backend
 
