@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -25,6 +30,9 @@ from app.services.conversation_service import (
     get_conversation_by_id,
     get_conversation_for_user,
 )
+from app.services.escalation_service import (
+    get_active_escalation_for_conversation,
+)
 from app.services.message_service import (
     create_ai_message,
     create_customer_message,
@@ -46,8 +54,10 @@ def support_has_access_to_conversation(
 ) -> bool:
     escalation = db.scalar(
         select(Escalation).where(
-            Escalation.conversation_id == conversation_id,
-            Escalation.assigned_to_user_id == user_id,
+            Escalation.conversation_id
+            == conversation_id,
+            Escalation.assigned_to_user_id
+            == user_id,
         )
     )
 
@@ -63,7 +73,9 @@ def send_message(
     conversation_id: int,
     message_data: MessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ) -> AgentMessageResponse:
     conversation = get_conversation_for_user(
         db=db,
@@ -83,6 +95,20 @@ def send_message(
         user_id=current_user.id,
         content=message_data.content,
     )
+
+    active_escalation = (
+        get_active_escalation_for_conversation(
+            db=db,
+            conversation_id=conversation_id,
+        )
+    )
+
+    if active_escalation is not None:
+        return AgentMessageResponse(
+            customer_message=customer_message,
+            ai_message=None,
+            orders=None,
+        )
 
     agent_run = create_agent_run(
         db=db,
@@ -113,7 +139,9 @@ def send_message(
             "escalation_id"
         )
 
-        escalated = escalation_id is not None
+        escalated = (
+            escalation_id is not None
+        )
 
         complete_agent_run(
             db=db,
@@ -189,7 +217,9 @@ def send_message(
 def get_admin_messages(
     conversation_id: int,
     db: Session = Depends(get_db),
-    current_admin: User = Depends(require_admin),
+    current_admin: User = Depends(
+        require_admin
+    ),
 ) -> list[MessageResponse]:
     conversation = get_conversation_by_id(
         db=db,
@@ -231,16 +261,21 @@ def get_support_messages(
         )
 
     if current_user.role == UserRole.SUPPORT:
-        has_access = support_has_access_to_conversation(
-            db=db,
-            conversation_id=conversation_id,
-            user_id=current_user.id,
+        has_access = (
+            support_has_access_to_conversation(
+                db=db,
+                conversation_id=conversation_id,
+                user_id=current_user.id,
+            )
         )
 
         if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This conversation is not assigned to you",
+                detail=(
+                    "This conversation is not "
+                    "assigned to you"
+                ),
             )
 
     return get_messages_for_conversation(
@@ -274,16 +309,21 @@ def send_support_message(
         )
 
     if current_user.role == UserRole.SUPPORT:
-        has_access = support_has_access_to_conversation(
-            db=db,
-            conversation_id=conversation_id,
-            user_id=current_user.id,
+        has_access = (
+            support_has_access_to_conversation(
+                db=db,
+                conversation_id=conversation_id,
+                user_id=current_user.id,
+            )
         )
 
         if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="This conversation is not assigned to you",
+                detail=(
+                    "This conversation is not "
+                    "assigned to you"
+                ),
             )
 
     return create_support_message(
@@ -301,7 +341,9 @@ def send_support_message(
 def get_messages(
     conversation_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
 ) -> list[MessageResponse]:
     conversation = get_conversation_for_user(
         db=db,

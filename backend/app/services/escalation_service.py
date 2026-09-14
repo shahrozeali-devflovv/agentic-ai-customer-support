@@ -4,8 +4,25 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.conversation import Conversation
-from app.models.escalation import Escalation, EscalationStatus
+from app.models.escalation import (
+    Escalation,
+    EscalationStatus,
+)
 from app.models.user import User, UserRole
+
+
+def get_active_escalation_for_conversation(
+    db: Session,
+    conversation_id: int,
+) -> Escalation | None:
+    return db.scalar(
+        select(Escalation).where(
+            Escalation.conversation_id
+            == conversation_id,
+            Escalation.status
+            != EscalationStatus.RESOLVED,
+        )
+    )
 
 
 def create_escalation(
@@ -21,12 +38,10 @@ def create_escalation(
     if conversation is None:
         return None
 
-    existing_escalation = db.scalar(
-        select(Escalation).where(
-            Escalation.conversation_id
-            == conversation_id,
-            Escalation.status
-            != EscalationStatus.RESOLVED,
+    existing_escalation = (
+        get_active_escalation_for_conversation(
+            db=db,
+            conversation_id=conversation_id,
         )
     )
 
