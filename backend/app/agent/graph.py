@@ -6,6 +6,9 @@ from app.agent.intent_classifier import (
     classify_intent,
 )
 from app.agent.state import AgentState
+from app.agent.tools.account_tool import (
+    get_customer_account,
+)
 from app.agent.tools.order_tool import (
     OrderToolResult,
     extract_order_number,
@@ -203,6 +206,84 @@ def order_node(
     }
 
 
+def account_node(
+    state: AgentState,
+    db: Session,
+) -> AgentState:
+    user_id = state.get(
+        "user_id"
+    )
+
+    if user_id is None:
+        return {
+            "answer": None,
+            "needs_escalation": True,
+        }
+
+    account = get_customer_account(
+        db=db,
+        user_id=user_id,
+    )
+
+    if not account.found:
+        return {
+            "answer": None,
+            "needs_escalation": True,
+        }
+
+    message = state[
+        "message"
+    ].lower()
+
+    if "email" in message:
+        answer = (
+            f"The email on your account is "
+            f"{account.email}."
+        )
+
+    elif (
+        "name" in message
+        or "full name" in message
+    ):
+        answer = (
+            f"The name on your account is "
+            f"{account.full_name}."
+        )
+
+    elif (
+        "active" in message
+        or "status" in message
+    ):
+        if account.is_active:
+            answer = (
+                "Your account is currently active."
+            )
+        else:
+            answer = (
+                "Your account is currently inactive."
+            )
+
+    elif "role" in message:
+        answer = (
+            f"Your account role is "
+            f"{account.role.value}."
+        )
+
+    else:
+        answer = (
+            f"Your account name is "
+            f"{account.full_name}, "
+            f"your email is {account.email}, "
+            f"and your account is "
+            f"{'active' if account.is_active else 'inactive'}."
+        )
+
+    return {
+        "answer": answer,
+        "needs_escalation": False,
+    }
+
+
 def fallback_node(
     state: AgentState,
 ) -> AgentState:
@@ -302,6 +383,9 @@ def route_by_intent(
     if state["intent"] == Intent.ORDER:
         return "order"
 
+    if state["intent"] == Intent.ACCOUNT:
+        return "account"
+
     if state["intent"] == Intent.HUMAN_SUPPORT:
         return "escalation"
 
@@ -349,6 +433,14 @@ def build_agent_graph(
     )
 
     graph.add_node(
+        "account",
+        lambda state: account_node(
+            state,
+            db,
+        ),
+    )
+
+    graph.add_node(
         "fallback",
         fallback_node,
     )
@@ -372,6 +464,7 @@ def build_agent_graph(
         {
             "knowledge": "knowledge",
             "order": "order",
+            "account": "account",
             "escalation": "escalation",
             "fallback": "fallback",
         },
@@ -388,6 +481,15 @@ def build_agent_graph(
 
     graph.add_conditional_edges(
         "order",
+        route_after_resolution,
+        {
+            "escalation": "escalation",
+            "end": END,
+        },
+    )
+
+    graph.add_conditional_edges(
+        "account",
         route_after_resolution,
         {
             "escalation": "escalation",
