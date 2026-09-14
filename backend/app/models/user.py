@@ -83,3 +83,7 @@ class User(Base):
         back_populates="assigned_to_user",
         foreign_keys="Escalation.assigned_to_user_id",
     )
+
+    knowledge_documents: Mapped[list["KnowledgeDocument"]] = relationship(
+        back_populates="uploaded_by_user",
+    )

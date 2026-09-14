@@ -1,5 +1,7 @@
 from app.models.conversation import Conversation
 from app.models.escalation import Escalation
+from app.models.knowledge_chunk import KnowledgeChunk
+from app.models.knowledge_document import KnowledgeDocument
 from app.models.message import Message
 from app.models.order import Order
 from app.models.password_reset_token import PasswordResetToken
@@ -12,4 +14,6 @@ __all__ = [
     "Message",
     "Escalation",
     "PasswordResetToken",
+    "KnowledgeDocument",
+    "KnowledgeChunk",
 ]
