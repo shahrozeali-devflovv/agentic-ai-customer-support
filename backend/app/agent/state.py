@@ -10,6 +10,8 @@ class AgentState(TypedDict, total=False):
 
     conversation_id: int
 
+    agent_run_id: int
+
     intent: Intent
 
     answer: str | None

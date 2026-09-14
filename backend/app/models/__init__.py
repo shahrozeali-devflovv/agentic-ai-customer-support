@@ -1,3 +1,5 @@
+from app.models.agent_run import AgentRun
+from app.models.agent_tool_call import AgentToolCall
 from app.models.conversation import Conversation
 from app.models.escalation import Escalation
 from app.models.knowledge_chunk import KnowledgeChunk
@@ -16,4 +18,6 @@ __all__ = [
     "PasswordResetToken",
     "KnowledgeDocument",
     "KnowledgeChunk",
+    "AgentRun",
+    "AgentToolCall",
 ]

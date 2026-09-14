@@ -79,3 +79,24 @@ def get_messages_for_conversation(
     ).all()
 
     return list(messages)
+
+
+def get_recent_messages_for_conversation(
+    db: Session,
+    conversation_id: int,
+    limit: int = 10,
+) -> list[Message]:
+    messages = db.scalars(
+        select(Message)
+        .where(
+            Message.conversation_id == conversation_id,
+        )
+        .order_by(
+            Message.created_at.desc(),
+        )
+        .limit(limit)
+    ).all()
+
+    return list(
+        reversed(messages)
+    )

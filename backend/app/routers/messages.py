@@ -9,12 +9,17 @@ from app.dependencies.auth import (
     require_admin,
     require_support_or_admin,
 )
+from app.models.agent_run import AgentRunOutcome
 from app.models.escalation import Escalation
 from app.models.user import User, UserRole
 from app.schemas.message import (
     AgentMessageResponse,
     MessageCreate,
     MessageResponse,
+)
+from app.services.agent_logging_service import (
+    complete_agent_run,
+    create_agent_run,
 )
 from app.services.conversation_service import (
     get_conversation_by_id,
@@ -79,40 +84,102 @@ def send_message(
         content=message_data.content,
     )
 
-    agent_graph = build_agent_graph(
+    agent_run = create_agent_run(
         db=db,
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        customer_message=message_data.content,
     )
 
-    agent_result = agent_graph.invoke(
-    {
-        "message": message_data.content,
-        "user_id": current_user.id,
-        "conversation_id": conversation_id,
-    }
-)
+    try:
+        agent_graph = build_agent_graph(
+            db=db,
+        )
 
-    agent_answer = agent_result.get(
-        "answer"
-    )
+        agent_result = agent_graph.invoke(
+            {
+                "message": message_data.content,
+                "user_id": current_user.id,
+                "conversation_id": conversation_id,
+                "agent_run_id": agent_run.id,
+            }
+        )
 
-    ai_message = None
+        intent = agent_result.get(
+            "intent"
+        )
 
-    if agent_answer:
+        escalation_id = agent_result.get(
+            "escalation_id"
+        )
+
+        escalated = escalation_id is not None
+
+        complete_agent_run(
+            db=db,
+            agent_run=agent_run,
+            intent=(
+                intent.value
+                if intent
+                else None
+            ),
+            outcome=(
+                AgentRunOutcome.ESCALATED
+                if escalated
+                else AgentRunOutcome.ANSWERED
+            ),
+            escalated=escalated,
+        )
+
+        agent_answer = agent_result.get(
+            "answer"
+        )
+
+        ai_message = None
+
+        if agent_answer:
+            ai_message = create_ai_message(
+                db=db,
+                conversation_id=conversation_id,
+                content=agent_answer,
+            )
+
+        orders = agent_result.get(
+            "orders"
+        )
+
+        return AgentMessageResponse(
+            customer_message=customer_message,
+            ai_message=ai_message,
+            orders=orders,
+        )
+
+    except Exception as exc:
+        db.rollback()
+
+        complete_agent_run(
+            db=db,
+            agent_run=agent_run,
+            intent=None,
+            outcome=AgentRunOutcome.FAILED,
+            escalated=False,
+            error_message=str(exc),
+        )
+
         ai_message = create_ai_message(
             db=db,
             conversation_id=conversation_id,
-            content=agent_answer,
+            content=(
+                "I’m unable to process your request "
+                "right now. Please try again shortly."
+            ),
         )
 
-    orders = agent_result.get(
-        "orders"
-    )
-
-    return AgentMessageResponse(
-        customer_message=customer_message,
-        ai_message=ai_message,
-        orders=orders,
-    )
+        return AgentMessageResponse(
+            customer_message=customer_message,
+            ai_message=ai_message,
+            orders=None,
+        )
 
 
 @router.get(
