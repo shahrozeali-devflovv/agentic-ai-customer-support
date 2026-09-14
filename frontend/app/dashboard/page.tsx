@@ -5,17 +5,8 @@ import { useEffect, useState } from "react";
 
 import DashboardHeader from "@/components/dashboard-header";
 import DashboardSidebar from "@/components/dashboard-sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/api";
-
-type User = {
-  id: number;
-  email: string;
-  full_name: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
 
 type Order = {
   id: number;
@@ -37,50 +28,48 @@ type Conversation = {
 };
 
 export default function DashboardPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { user, token, isLoading: isAuthLoading } =
+    useAuth({
+      allowedRoles: ["customer"],
+    });
 
-  const [user, setUser] = useState<User | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] =
+    useState(false);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [conversations, setConversations] = useState<
     Conversation[]
   >([]);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] =
+    useState(false);
+
   const [error, setError] = useState("");
 
   useEffect(() => {
-    async function loadDashboard() {
-      const token = localStorage.getItem("access_token");
-
+    async function loadDashboardData() {
       if (!token) {
-        setError("You are not logged in.");
-        setIsLoading(false);
         return;
       }
 
+      setIsDataLoading(true);
+      setError("");
+
       try {
-        const [
-          userData,
-          orderData,
-          conversationData,
-        ] = await Promise.all([
-          apiRequest<User>("/users/me", {
-            token,
-          }),
-
-          apiRequest<Order[]>("/orders", {
-            token,
-          }),
-
-          apiRequest<Conversation[]>(
-            "/conversations",
-            {
+        const [orderData, conversationData] =
+          await Promise.all([
+            apiRequest<Order[]>("/orders", {
               token,
-            },
-          ),
-        ]);
+            }),
 
-        setUser(userData);
+            apiRequest<Conversation[]>(
+              "/conversations",
+              {
+                token,
+              },
+            ),
+          ]);
+
         setOrders(orderData);
         setConversations(conversationData);
       } catch (error) {
@@ -88,15 +77,28 @@ export default function DashboardPage() {
           setError(error.message);
         }
       } finally {
-        setIsLoading(false);
+        setIsDataLoading(false);
       }
     }
 
-    loadDashboard();
-  }, []);
+    loadDashboardData();
+  }, [token]);
 
+  const isLoading =
+  isAuthLoading || isDataLoading;
+
+if (isAuthLoading || !user) {
   return (
-    <main className="min-h-screen bg-soft-white">
+    <main className="flex min-h-screen items-center justify-center bg-soft-white">
+      <p className="text-text-secondary">
+        Checking authentication...
+      </p>
+    </main>
+  );
+}
+
+return (
+  <main className="min-h-screen bg-soft-white">
       <DashboardSidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -122,13 +124,6 @@ export default function DashboardPage() {
               <p className="font-semibold text-text-primary">
                 {error}
               </p>
-
-              <Link
-                href="/"
-                className="mt-3 inline-block text-sm font-semibold text-dark-green"
-              >
-                Return to sign in
-              </Link>
             </div>
           )}
 
@@ -217,27 +212,29 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {orders.slice(0, 3).map((order) => (
-                        <div
-                          key={order.id}
-                          className="flex flex-col gap-3 rounded-xl border border-border-soft p-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div>
-                            <p className="font-semibold text-text-primary">
-                              {order.order_number}
-                            </p>
+                      {orders
+                        .slice(0, 3)
+                        .map((order) => (
+                          <div
+                            key={order.id}
+                            className="flex flex-col gap-3 rounded-xl border border-border-soft p-4 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div>
+                              <p className="font-semibold text-text-primary">
+                                {order.order_number}
+                              </p>
 
-                            <p className="mt-1 text-sm capitalize text-text-secondary">
-                              {order.status}
+                              <p className="mt-1 text-sm capitalize text-text-secondary">
+                                {order.status}
+                              </p>
+                            </div>
+
+                            <p className="font-bold text-dark-green">
+                              {order.currency}{" "}
+                              {order.total_amount}
                             </p>
                           </div>
-
-                          <p className="font-bold text-dark-green">
-                            {order.currency}{" "}
-                            {order.total_amount}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   )}
                 </div>

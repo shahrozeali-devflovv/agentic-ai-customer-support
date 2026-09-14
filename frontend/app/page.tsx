@@ -4,6 +4,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { apiRequest } from "@/lib/api";
+
+type LoginResponse = {
+  access_token: string;
+  token_type: string;
+};
+
+type User = {
+  id: number;
+  email: string;
+  full_name: string;
+  role: "customer" | "admin" | "support";
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export default function Home() {
   const router = useRouter();
 
@@ -11,8 +28,6 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   async function handleLogin(
     event: FormEvent<HTMLFormElement>,
@@ -23,13 +38,10 @@ export default function Home() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        `${apiUrl}/auth/login`,
+      const loginData = await apiRequest<LoginResponse>(
+        "/auth/login",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             email,
             password,
@@ -37,21 +49,32 @@ export default function Home() {
         },
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail || "Login failed",
-        );
-      }
-
       localStorage.setItem(
         "access_token",
-        data.access_token,
+        loginData.access_token,
       );
 
-      router.push("/dashboard");
+      const user = await apiRequest<User>(
+        "/users/me",
+        {
+          token: loginData.access_token,
+        },
+      );
+
+      if (user.role === "admin") {
+        router.replace("/admin");
+        return;
+      }
+
+      if (user.role === "support") {
+        router.replace("/support");
+        return;
+      }
+
+      router.replace("/dashboard");
     } catch (error) {
+      localStorage.removeItem("access_token");
+
       if (error instanceof Error) {
         setMessage(error.message);
       }

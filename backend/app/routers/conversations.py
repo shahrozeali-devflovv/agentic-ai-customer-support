@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import (
+    get_current_user,
+    require_admin,
+    require_support_or_admin,
+)
 from app.models.user import User
 from app.schemas.conversation import (
     ConversationCreate,
@@ -10,6 +14,9 @@ from app.schemas.conversation import (
 )
 from app.services.conversation_service import (
     create_conversation,
+    get_all_conversations,
+    get_conversation_by_id,
+    get_conversation_for_support,
     get_conversation_for_user,
     get_conversations_for_user,
 )
@@ -36,6 +43,71 @@ def start_conversation(
         user_id=current_user.id,
         conversation_data=conversation_data,
     )
+
+
+@router.get(
+    "/admin/all",
+    response_model=list[ConversationResponse],
+)
+def get_admin_conversations(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+) -> list[ConversationResponse]:
+    return get_all_conversations(
+        db=db,
+    )
+
+
+@router.get(
+    "/admin/{conversation_id}",
+    response_model=ConversationResponse,
+)
+def get_admin_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+) -> ConversationResponse:
+    conversation = get_conversation_by_id(
+        db=db,
+        conversation_id=conversation_id,
+    )
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+
+    return conversation
+
+
+@router.get(
+    "/support/{conversation_id}",
+    response_model=ConversationResponse,
+)
+def get_support_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_support_or_admin,
+    ),
+) -> ConversationResponse:
+    conversation = get_conversation_for_support(
+        db=db,
+        conversation_id=conversation_id,
+        support_user_id=current_user.id,
+    )
+
+    if conversation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Conversation not found or "
+                "not assigned to you"
+            ),
+        )
+
+    return conversation
 
 
 @router.get(

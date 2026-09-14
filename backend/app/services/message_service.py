@@ -24,13 +24,35 @@ def create_customer_message(
     return message
 
 
+def create_support_message(
+    db: Session,
+    conversation_id: int,
+    user_id: int,
+    content: str,
+) -> Message:
+    message = Message(
+        conversation_id=conversation_id,
+        sender_type=MessageSenderType.SUPPORT,
+        sender_user_id=user_id,
+        content=content,
+    )
+
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    return message
+
+
 def get_messages_for_conversation(
     db: Session,
     conversation_id: int,
 ) -> list[Message]:
     messages = db.scalars(
         select(Message)
-        .where(Message.conversation_id == conversation_id)
+        .where(
+            Message.conversation_id == conversation_id,
+        )
         .order_by(Message.created_at)
     ).all()
 

@@ -10,7 +10,7 @@ from app.routers.auth import router as auth_router
 from app.routers.orders import router as orders_router
 from app.routers.users import router as users_router
 from app.routers.messages import router as messages_router
-
+from app.routers.escalations import router as escalations_router
 
 app = FastAPI()
 
@@ -29,7 +29,7 @@ app.include_router(users_router)
 app.include_router(orders_router)
 app.include_router(conversations_router)
 app.include_router(messages_router)
-
+app.include_router(escalations_router)
 @app.get("/health")
 def health_check():
     return {

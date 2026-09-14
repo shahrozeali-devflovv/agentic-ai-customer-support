@@ -151,8 +151,8 @@ export default function CustomerConversationPage() {
           },
         );
 
-      setMessages((currentMessages) => [
-        ...currentMessages,
+      setMessages((current) => [
+        ...current,
         newMessage,
       ]);
 

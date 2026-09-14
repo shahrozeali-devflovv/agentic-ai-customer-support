@@ -5,17 +5,8 @@ import { FormEvent, useEffect, useState } from "react";
 
 import DashboardHeader from "@/components/dashboard-header";
 import DashboardSidebar from "@/components/dashboard-sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/api";
-
-type User = {
-  id: number;
-  email: string;
-  full_name: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
 
 type Conversation = {
   id: number;
@@ -26,67 +17,63 @@ type Conversation = {
 };
 
 export default function ConversationsPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { user, token, isLoading: isAuthLoading } =
+    useAuth({
+      allowedRoles: ["customer"],
+    });
 
-  const [user, setUser] = useState<User | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] =
+    useState(false);
+
   const [conversations, setConversations] = useState<
     Conversation[]
   >([]);
 
   const [title, setTitle] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] =
+    useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function loadConversations() {
-      const token = localStorage.getItem("access_token");
-
       if (!token) {
-        setError("You are not logged in.");
-        setIsLoading(false);
         return;
       }
 
+      setIsDataLoading(true);
+      setError("");
+
       try {
-        const [userData, conversationData] =
-          await Promise.all([
-            apiRequest<User>("/users/me", {
+        const conversationData =
+          await apiRequest<Conversation[]>(
+            "/conversations",
+            {
               token,
-            }),
+            },
+          );
 
-            apiRequest<Conversation[]>(
-              "/conversations",
-              {
-                token,
-              },
-            ),
-          ]);
-
-        setUser(userData);
         setConversations(conversationData);
       } catch (error) {
         if (error instanceof Error) {
           setError(error.message);
         }
       } finally {
-        setIsLoading(false);
+        setIsDataLoading(false);
       }
     }
 
     loadConversations();
-  }, []);
+  }, [token]);
 
   async function handleCreateConversation(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
-    const token = localStorage.getItem("access_token");
-
     if (!token) {
-      setError("You are not logged in.");
       return;
     }
 
@@ -147,6 +134,19 @@ export default function ConversationsPage() {
     }
   }
 
+  const isLoading =
+    isAuthLoading || isDataLoading;
+
+  if (isAuthLoading || !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-soft-white">
+        <p className="text-text-secondary">
+          Checking authentication...
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-soft-white">
       <DashboardSidebar
@@ -157,7 +157,7 @@ export default function ConversationsPage() {
       <div className="lg:ml-72">
         <DashboardHeader
           onMenuClick={() => setIsSidebarOpen(true)}
-          userName={user?.full_name || "Customer"}
+          userName={user.full_name}
         />
 
         <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -260,48 +260,49 @@ export default function ConversationsPage() {
               </div>
             )}
 
-          {!isLoading && conversations.length > 0 && (
-            <section className="space-y-4">
-              {conversations.map((conversation) => (
-                <Link
-                  key={conversation.id}
-                  href={`/conversations/${conversation.id}`}
-                  className="block rounded-2xl border border-border-soft bg-white p-5 transition hover:border-dark-green sm:p-6"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="truncate text-lg font-bold text-text-primary">
-                          {conversation.title ||
-                            `Conversation #${conversation.id}`}
-                        </h3>
+          {!isLoading &&
+            conversations.length > 0 && (
+              <section className="space-y-4">
+                {conversations.map((conversation) => (
+                  <Link
+                    key={conversation.id}
+                    href={`/conversations/${conversation.id}`}
+                    className="block rounded-2xl border border-border-soft bg-white p-5 transition hover:border-dark-green sm:p-6"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="truncate text-lg font-bold text-text-primary">
+                            {conversation.title ||
+                              `Conversation #${conversation.id}`}
+                          </h3>
 
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClasses(
-                            conversation.status,
-                          )}`}
-                        >
-                          {conversation.status}
-                        </span>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClasses(
+                              conversation.status,
+                            )}`}
+                          >
+                            {conversation.status}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-sm text-text-secondary">
+                          Created{" "}
+                          {formatDate(
+                            conversation.created_at,
+                          )}
+                        </p>
                       </div>
 
-                      <p className="mt-2 text-sm text-text-secondary">
-                        Created{" "}
-                        {formatDate(
-                          conversation.created_at,
-                        )}
-                      </p>
+                      <div className="flex items-center gap-2 font-semibold text-dark-green">
+                        Open
+                        <span>→</span>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-2 font-semibold text-dark-green">
-                      Open
-                      <span>→</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </section>
-          )}
+                  </Link>
+                ))}
+              </section>
+            )}
         </div>
       </div>
     </main>

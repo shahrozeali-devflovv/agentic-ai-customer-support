@@ -4,17 +4,8 @@ import { useEffect, useState } from "react";
 
 import DashboardHeader from "@/components/dashboard-header";
 import DashboardSidebar from "@/components/dashboard-sidebar";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/api";
-
-type User = {
-  id: number;
-  email: string;
-  full_name: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
 
 type Order = {
   id: number;
@@ -28,48 +19,48 @@ type Order = {
 };
 
 export default function OrdersPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { user, token, isLoading: isAuthLoading } =
+    useAuth({
+      allowedRoles: ["customer"],
+    });
 
-  const [user, setUser] = useState<User | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] =
+    useState(false);
+
   const [orders, setOrders] = useState<Order[]>([]);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] =
+    useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadOrders() {
-      const token = localStorage.getItem("access_token");
-
       if (!token) {
-        setError("You are not logged in.");
-        setIsLoading(false);
         return;
       }
 
+      setIsDataLoading(true);
+      setError("");
+
       try {
-        const [userData, orderData] = await Promise.all([
-          apiRequest<User>("/users/me", {
+        const orderData = await apiRequest<Order[]>(
+          "/orders",
+          {
             token,
-          }),
+          },
+        );
 
-          apiRequest<Order[]>("/orders", {
-            token,
-          }),
-        ]);
-
-        setUser(userData);
         setOrders(orderData);
       } catch (error) {
         if (error instanceof Error) {
           setError(error.message);
         }
       } finally {
-        setIsLoading(false);
+        setIsDataLoading(false);
       }
     }
 
     loadOrders();
-  }, []);
+  }, [token]);
 
   function formatDate(date: string | null) {
     if (!date) {
@@ -105,6 +96,19 @@ export default function OrdersPage() {
     }
   }
 
+  const isLoading =
+    isAuthLoading || isDataLoading;
+
+  if (isAuthLoading || !user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-soft-white">
+        <p className="text-text-secondary">
+          Checking authentication...
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-soft-white">
       <DashboardSidebar
@@ -115,7 +119,7 @@ export default function OrdersPage() {
       <div className="lg:ml-72">
         <DashboardHeader
           onMenuClick={() => setIsSidebarOpen(true)}
-          userName={user?.full_name || "Customer"}
+          userName={user.full_name}
         />
 
         <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -150,156 +154,165 @@ export default function OrdersPage() {
             </div>
           )}
 
-          {!isLoading && !error && orders.length === 0 && (
-            <div className="rounded-2xl border border-border-soft bg-white p-8 text-center sm:p-12">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-soft-yellow text-2xl">
-                📦
+          {!isLoading &&
+            !error &&
+            orders.length === 0 && (
+              <div className="rounded-2xl border border-border-soft bg-white p-8 text-center sm:p-12">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-soft-yellow text-2xl">
+                  📦
+                </div>
+
+                <h3 className="mt-5 text-lg font-bold text-text-primary">
+                  No orders yet
+                </h3>
+
+                <p className="mt-2 text-sm text-text-secondary">
+                  Your orders will appear here once they
+                  are available.
+                </p>
               </div>
+            )}
 
-              <h3 className="mt-5 text-lg font-bold text-text-primary">
-                No orders yet
-              </h3>
+          {!isLoading &&
+            !error &&
+            orders.length > 0 && (
+              <>
+                <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-border-soft bg-white p-5">
+                    <p className="text-sm text-text-secondary">
+                      Total orders
+                    </p>
 
-              <p className="mt-2 text-sm text-text-secondary">
-                Your orders will appear here once they
-                are available.
-              </p>
-            </div>
-          )}
+                    <p className="mt-2 text-3xl font-bold text-text-primary">
+                      {orders.length}
+                    </p>
+                  </div>
 
-          {!isLoading && !error && orders.length > 0 && (
-            <>
-              <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border border-border-soft bg-white p-5">
-                  <p className="text-sm text-text-secondary">
-                    Total orders
-                  </p>
+                  <div className="rounded-2xl border border-border-soft bg-white p-5">
+                    <p className="text-sm text-text-secondary">
+                      Processing
+                    </p>
 
-                  <p className="mt-2 text-3xl font-bold text-text-primary">
-                    {orders.length}
-                  </p>
-                </div>
+                    <p className="mt-2 text-3xl font-bold text-text-primary">
+                      {
+                        orders.filter(
+                          (order) =>
+                            order.status ===
+                            "processing",
+                        ).length
+                      }
+                    </p>
+                  </div>
 
-                <div className="rounded-2xl border border-border-soft bg-white p-5">
-                  <p className="text-sm text-text-secondary">
-                    Processing
-                  </p>
+                  <div className="rounded-2xl border border-border-soft bg-white p-5">
+                    <p className="text-sm text-text-secondary">
+                      Shipped
+                    </p>
 
-                  <p className="mt-2 text-3xl font-bold text-text-primary">
-                    {
-                      orders.filter(
-                        (order) =>
-                          order.status === "processing",
-                      ).length
-                    }
-                  </p>
-                </div>
+                    <p className="mt-2 text-3xl font-bold text-text-primary">
+                      {
+                        orders.filter(
+                          (order) =>
+                            order.status ===
+                            "shipped",
+                        ).length
+                      }
+                    </p>
+                  </div>
 
-                <div className="rounded-2xl border border-border-soft bg-white p-5">
-                  <p className="text-sm text-text-secondary">
-                    Shipped
-                  </p>
+                  <div className="rounded-2xl bg-dark-green p-5 text-white">
+                    <p className="text-sm text-white/70">
+                      Delivered
+                    </p>
 
-                  <p className="mt-2 text-3xl font-bold text-text-primary">
-                    {
-                      orders.filter(
-                        (order) =>
-                          order.status === "shipped",
-                      ).length
-                    }
-                  </p>
-                </div>
+                    <p className="mt-2 text-3xl font-bold">
+                      {
+                        orders.filter(
+                          (order) =>
+                            order.status ===
+                            "delivered",
+                        ).length
+                      }
+                    </p>
+                  </div>
+                </section>
 
-                <div className="rounded-2xl bg-dark-green p-5 text-white">
-                  <p className="text-sm text-white/70">
-                    Delivered
-                  </p>
+                <section className="space-y-4">
+                  {orders.map((order) => (
+                    <article
+                      key={order.id}
+                      className="rounded-2xl border border-border-soft bg-white p-5 sm:p-6"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h3 className="text-lg font-bold text-text-primary">
+                              {order.order_number}
+                            </h3>
 
-                  <p className="mt-2 text-3xl font-bold">
-                    {
-                      orders.filter(
-                        (order) =>
-                          order.status === "delivered",
-                      ).length
-                    }
-                  </p>
-                </div>
-              </section>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClasses(
+                                order.status,
+                              )}`}
+                            >
+                              {order.status}
+                            </span>
+                          </div>
 
-              <section className="space-y-4">
-                {orders.map((order) => (
-                  <article
-                    key={order.id}
-                    className="rounded-2xl border border-border-soft bg-white p-5 sm:p-6"
-                  >
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-lg font-bold text-text-primary">
-                            {order.order_number}
-                          </h3>
-
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClasses(
-                              order.status,
-                            )}`}
-                          >
-                            {order.status}
-                          </span>
+                          <p className="mt-2 text-sm text-text-secondary">
+                            Placed on{" "}
+                            {formatDate(
+                              order.placed_at,
+                            )}
+                          </p>
                         </div>
 
-                        <p className="mt-2 text-sm text-text-secondary">
-                          Placed on{" "}
-                          {formatDate(order.placed_at)}
+                        <p className="text-xl font-bold text-dark-green">
+                          {order.currency}{" "}
+                          {order.total_amount}
                         </p>
                       </div>
 
-                      <p className="text-xl font-bold text-dark-green">
-                        {order.currency}{" "}
-                        {order.total_amount}
-                      </p>
-                    </div>
+                      <div className="mt-5 grid gap-4 border-t border-border-soft pt-5 sm:grid-cols-2 lg:grid-cols-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                            Status
+                          </p>
 
-                    <div className="mt-5 grid gap-4 border-t border-border-soft pt-5 sm:grid-cols-2 lg:grid-cols-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                          Status
-                        </p>
+                          <p className="mt-1 text-sm font-semibold capitalize text-text-primary">
+                            {order.status}
+                          </p>
+                        </div>
 
-                        <p className="mt-1 text-sm font-semibold capitalize text-text-primary">
-                          {order.status}
-                        </p>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                            Estimated delivery
+                          </p>
+
+                          <p className="mt-1 text-sm font-semibold text-text-primary">
+                            {formatDate(
+                              order.estimated_delivery_at,
+                            )}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                            Delivered
+                          </p>
+
+                          <p className="mt-1 text-sm font-semibold text-text-primary">
+                            {formatDate(
+                              order.delivered_at,
+                            )}
+                          </p>
+                        </div>
                       </div>
-
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                          Estimated delivery
-                        </p>
-
-                        <p className="mt-1 text-sm font-semibold text-text-primary">
-                          {formatDate(
-                            order.estimated_delivery_at,
-                          )}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                          Delivered
-                        </p>
-
-                        <p className="mt-1 text-sm font-semibold text-text-primary">
-                          {formatDate(
-                            order.delivered_at,
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </section>
-            </>
-          )}
+                    </article>
+                  ))}
+                </section>
+              </>
+            )}
         </div>
       </div>
     </main>
