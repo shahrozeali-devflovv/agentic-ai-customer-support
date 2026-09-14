@@ -10,8 +10,12 @@ def get_orders_for_user(
 ) -> list[Order]:
     orders = db.scalars(
         select(Order)
-        .where(Order.user_id == user_id)
-        .order_by(Order.placed_at.desc())
+        .where(
+            Order.user_id == user_id
+        )
+        .order_by(
+            Order.placed_at.desc()
+        )
     ).all()
 
     return list(orders)
@@ -25,6 +29,19 @@ def get_order_for_user(
     return db.scalar(
         select(Order).where(
             Order.id == order_id,
+            Order.user_id == user_id,
+        )
+    )
+
+
+def get_order_by_number_for_user(
+    db: Session,
+    order_number: str,
+    user_id: int,
+) -> Order | None:
+    return db.scalar(
+        select(Order).where(
+            Order.order_number == order_number,
             Order.user_id == user_id,
         )
     )
