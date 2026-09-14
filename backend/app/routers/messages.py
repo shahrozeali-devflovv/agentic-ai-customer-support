@@ -84,11 +84,12 @@ def send_message(
     )
 
     agent_result = agent_graph.invoke(
-        {
-            "message": message_data.content,
-            "user_id": current_user.id,
-        }
-    )
+    {
+        "message": message_data.content,
+        "user_id": current_user.id,
+        "conversation_id": conversation_id,
+    }
+)
 
     agent_answer = agent_result.get(
         "answer"

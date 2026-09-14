@@ -5,7 +5,10 @@ from app.agent.intent_classifier import Intent
 
 class AgentState(TypedDict, total=False):
     message: str
+
     user_id: int
+
+    conversation_id: int
 
     intent: Intent
 
@@ -16,3 +19,5 @@ class AgentState(TypedDict, total=False):
     has_context: bool
 
     needs_escalation: bool
+
+    escalation_id: int | None

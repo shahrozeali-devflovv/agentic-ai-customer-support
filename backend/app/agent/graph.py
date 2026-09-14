@@ -12,6 +12,9 @@ from app.agent.tools.order_tool import (
     get_customer_order,
     get_customer_orders,
 )
+from app.services.escalation_service import (
+    create_escalation,
+)
 from app.services.rag_service import (
     answer_with_knowledge_base,
 )
@@ -96,10 +99,7 @@ def order_node(
 
     if user_id is None:
         return {
-            "answer": (
-                "I could not verify which customer "
-                "is requesting the order information."
-            ),
+            "answer": None,
             "orders": None,
             "needs_escalation": True,
         }
@@ -213,6 +213,86 @@ def fallback_node(
     }
 
 
+def escalation_node(
+    state: AgentState,
+    db: Session,
+) -> AgentState:
+    conversation_id = state.get(
+        "conversation_id"
+    )
+
+    if conversation_id is None:
+        return {
+            "answer": (
+                "I could not create a human support "
+                "request for this conversation."
+            ),
+            "needs_escalation": True,
+            "escalation_id": None,
+        }
+
+    intent = state.get(
+        "intent"
+    )
+
+    if intent == Intent.HUMAN_SUPPORT:
+        reason = (
+            "Customer explicitly requested "
+            "human support."
+        )
+
+    elif intent == Intent.ACCOUNT:
+        reason = (
+            "Account-related request requires "
+            "human support."
+        )
+
+    elif intent == Intent.KNOWLEDGE:
+        reason = (
+            "The knowledge base did not contain "
+            "enough trusted information to answer "
+            "the customer's question."
+        )
+
+    elif intent == Intent.ORDER:
+        reason = (
+            "The order request could not be "
+            "resolved automatically."
+        )
+
+    else:
+        reason = (
+            "The AI agent could not confidently "
+            "resolve the customer's request."
+        )
+
+    escalation = create_escalation(
+        db=db,
+        conversation_id=conversation_id,
+        reason=reason,
+    )
+
+    if escalation is None:
+        return {
+            "answer": (
+                "I could not create a human support "
+                "request at this time."
+            ),
+            "needs_escalation": True,
+            "escalation_id": None,
+        }
+
+    return {
+        "answer": (
+            "I’m unable to resolve this automatically, "
+            "so I’ve escalated this conversation to "
+            "human support."
+        ),
+        "needs_escalation": True,
+        "escalation_id": escalation.id,
+    }
+
+
 def route_by_intent(
     state: AgentState,
 ) -> str:
@@ -222,7 +302,22 @@ def route_by_intent(
     if state["intent"] == Intent.ORDER:
         return "order"
 
+    if state["intent"] == Intent.HUMAN_SUPPORT:
+        return "escalation"
+
     return "fallback"
+
+
+def route_after_resolution(
+    state: AgentState,
+) -> str:
+    if state.get(
+        "needs_escalation",
+        False,
+    ):
+        return "escalation"
+
+    return "end"
 
 
 def build_agent_graph(
@@ -258,6 +353,14 @@ def build_agent_graph(
         fallback_node,
     )
 
+    graph.add_node(
+        "escalation",
+        lambda state: escalation_node(
+            state,
+            db,
+        ),
+    )
+
     graph.add_edge(
         START,
         "classify",
@@ -269,22 +372,36 @@ def build_agent_graph(
         {
             "knowledge": "knowledge",
             "order": "order",
+            "escalation": "escalation",
             "fallback": "fallback",
         },
     )
 
-    graph.add_edge(
+    graph.add_conditional_edges(
         "knowledge",
-        END,
+        route_after_resolution,
+        {
+            "escalation": "escalation",
+            "end": END,
+        },
     )
 
-    graph.add_edge(
+    graph.add_conditional_edges(
         "order",
-        END,
+        route_after_resolution,
+        {
+            "escalation": "escalation",
+            "end": END,
+        },
     )
 
     graph.add_edge(
         "fallback",
+        "escalation",
+    )
+
+    graph.add_edge(
+        "escalation",
         END,
     )
 
