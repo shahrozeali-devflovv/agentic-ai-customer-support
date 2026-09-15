@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import DashboardHeader from "@/components/dashboard-header";
 import DashboardSidebar from "@/components/dashboard-sidebar";
@@ -23,29 +23,50 @@ export default function ProfilePage() {
       allowedRoles: ["customer"],
     });
 
+  if (isAuthLoading || !user || !token) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-soft-white">
+        <p className="text-text-secondary">
+          Checking authentication...
+        </p>
+      </main>
+    );
+  }
+
+  return (
+    <ProfileContent
+      initialUser={user}
+      token={token}
+    />
+  );
+}
+
+function ProfileContent({
+  initialUser,
+  token,
+}: {
+  initialUser: User;
+  token: string;
+}) {
   const [isSidebarOpen, setIsSidebarOpen] =
     useState(false);
 
-  const [fullName, setFullName] = useState("");
+  const [currentUser, setCurrentUser] =
+    useState<User>(initialUser);
+
+  const [fullName, setFullName] = useState(
+    initialUser.full_name,
+  );
+
   const [isSaving, setIsSaving] = useState(false);
 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    if (user) {
-      setFullName(user.full_name);
-    }
-  }, [user]);
-
   async function handleUpdateProfile(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
-
-    if (!token || !user) {
-      return;
-    }
 
     const trimmedName = fullName.trim();
 
@@ -70,6 +91,7 @@ export default function ProfilePage() {
         },
       );
 
+      setCurrentUser(updatedUser);
       setFullName(updatedUser.full_name);
       setMessage("Profile updated successfully.");
     } catch (error) {
@@ -82,20 +104,13 @@ export default function ProfilePage() {
   }
 
   function formatDate(value: string) {
-    return new Date(value).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }
-
-  if (isAuthLoading || !user) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-soft-white">
-        <p className="text-text-secondary">
-          Checking authentication...
-        </p>
-      </main>
+    return new Date(value).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
     );
   }
 
@@ -109,7 +124,7 @@ export default function ProfilePage() {
       <div className="lg:ml-72">
         <DashboardHeader
           onMenuClick={() => setIsSidebarOpen(true)}
-          userName={fullName || user.full_name}
+          userName={currentUser.full_name}
         />
 
         <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -188,7 +203,7 @@ export default function ProfilePage() {
                   <input
                     id="email"
                     type="email"
-                    value={user.email}
+                    value={currentUser.email}
                     disabled
                     className="w-full cursor-not-allowed rounded-xl border border-border-soft bg-gray-100 px-4 py-3.5 text-text-secondary"
                   />
@@ -203,9 +218,10 @@ export default function ProfilePage() {
                   disabled={
                     isSaving ||
                     !fullName.trim() ||
-                    fullName.trim() === user.full_name
+                    fullName.trim() ===
+                      currentUser.full_name
                   }
-                  className="w-full rounded-xl bg-dark-green px-5 py-3.5 font-semibold text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="w-full rounded-xl bg-dark-green px-5 py-3.5 font-semibold !text-white transition hover:bg-deep-green hover:!text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {isSaving
                     ? "Saving..."
@@ -215,23 +231,23 @@ export default function ProfilePage() {
             </section>
 
             <aside className="space-y-6">
-              <div className="rounded-2xl bg-dark-green p-6 text-white">
+              <div className="rounded-2xl bg-dark-green p-6 !text-white">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-yellow text-2xl font-bold text-dark-green">
-                  {(fullName || user.full_name)
+                  {currentUser.full_name
                     .charAt(0)
                     .toUpperCase()}
                 </div>
 
-                <h3 className="mt-5 text-xl font-bold">
-                  {fullName || user.full_name}
+                <h3 className="mt-5 text-xl font-bold !text-white">
+                  {currentUser.full_name}
                 </h3>
 
-                <p className="mt-1 break-all text-sm text-white/65">
-                  {user.email}
+                <p className="mt-1 break-all text-sm !text-white/65">
+                  {currentUser.email}
                 </p>
 
-                <div className="mt-5 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold capitalize">
-                  {user.role}
+                <div className="mt-5 inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold capitalize !text-white">
+                  {currentUser.role}
                 </div>
               </div>
 
@@ -247,7 +263,7 @@ export default function ProfilePage() {
                     </p>
 
                     <p className="mt-1 font-semibold text-dark-green">
-                      {user.is_active
+                      {currentUser.is_active
                         ? "Active"
                         : "Inactive"}
                     </p>
@@ -259,7 +275,9 @@ export default function ProfilePage() {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-text-primary">
-                      {formatDate(user.created_at)}
+                      {formatDate(
+                        currentUser.created_at,
+                      )}
                     </p>
                   </div>
 
@@ -269,7 +287,7 @@ export default function ProfilePage() {
                     </p>
 
                     <p className="mt-1 text-sm font-semibold text-text-primary">
-                      #{user.id}
+                      #{currentUser.id}
                     </p>
                   </div>
                 </div>

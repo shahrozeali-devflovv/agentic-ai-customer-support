@@ -41,3 +41,4 @@ pgvector==0.5.0
 google-genai
 groq
 langgraph
+pytest
