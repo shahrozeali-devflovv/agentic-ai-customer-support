@@ -33,10 +33,6 @@ const navigationItems = [
     label: "Agent Activity",
     href: "/admin/agent-activity",
   },
-  {
-    label: "Settings",
-    href: "/admin/settings",
-  },
 ];
 
 export default function AdminSidebar({
@@ -58,7 +54,9 @@ export default function AdminSidebar({
 
       <aside
         className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col bg-dark-green px-5 py-6 text-white transition-transform duration-300 lg:translate-x-0 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          isOpen
+            ? "translate-x-0"
+            : "-translate-x-full"
         }`}
       >
         <div className="mb-10 flex items-center justify-between">
@@ -97,7 +95,9 @@ export default function AdminSidebar({
             const isActive =
               item.href === "/admin"
                 ? pathname === "/admin"
-                : pathname.startsWith(item.href);
+                : pathname.startsWith(
+                    item.href,
+                  );
 
             return (
               <Link

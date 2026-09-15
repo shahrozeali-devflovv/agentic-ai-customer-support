@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import DashboardHeader from "@/components/dashboard-header";
 import DashboardSidebar from "@/components/dashboard-sidebar";
@@ -17,6 +18,8 @@ type Conversation = {
 };
 
 export default function ConversationsPage() {
+  const router = useRouter();
+
   const { user, token, isLoading: isAuthLoading } =
     useAuth({
       allowedRoles: ["customer"],
@@ -29,13 +32,13 @@ export default function ConversationsPage() {
     Conversation[]
   >([]);
 
-  const [title, setTitle] = useState("");
   const [isDataLoading, setIsDataLoading] =
     useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+
+  const [isCreating, setIsCreating] =
+    useState(false);
 
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function loadConversations() {
@@ -68,18 +71,13 @@ export default function ConversationsPage() {
     loadConversations();
   }, [token]);
 
-  async function handleCreateConversation(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    if (!token) {
+  async function handleCreateConversation() {
+    if (!token || isCreating) {
       return;
     }
 
     setIsCreating(true);
     setError("");
-    setMessage("");
 
     try {
       const newConversation =
@@ -89,33 +87,32 @@ export default function ConversationsPage() {
             method: "POST",
             token,
             body: JSON.stringify({
-              title: title.trim() || null,
+              title: null,
             }),
           },
         );
 
-      setConversations((current) => [
-        newConversation,
-        ...current,
-      ]);
-
-      setTitle("");
-      setMessage("Conversation created successfully.");
+      router.push(
+        `/conversations/${newConversation.id}`,
+      );
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);
       }
-    } finally {
+
       setIsCreating(false);
     }
   }
 
   function formatDate(value: string) {
-    return new Date(value).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return new Date(value).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      },
+    );
   }
 
   function getStatusClasses(status: string) {
@@ -171,61 +168,42 @@ export default function ConversationsPage() {
             </h2>
 
             <p className="mt-2 max-w-2xl text-text-secondary">
-              Start a new support conversation or continue
-              an existing one.
+              Start a new AI support conversation or
+              continue an existing one.
             </p>
           </section>
 
           <section className="mb-8 rounded-2xl bg-dark-green p-5 text-white sm:p-6">
-            <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-yellow">
-                  Start new conversation
+                  AI Support
                 </p>
 
                 <h3 className="mt-2 text-xl font-bold sm:text-2xl">
-                  What do you need help with?
+                  How can we help you today?
                 </h3>
 
-                <p className="mt-2 max-w-xl text-sm leading-6 text-white/65">
-                  Create a conversation now. AI responses
-                  will be connected later during the
-                  Agentic AI phase.
+                <p className="mt-2 max-w-xl text-sm leading-6 text-white/70">
+                  Start a conversation with our AI support
+                  assistant. You can ask about your orders,
+                  account, company policies, or request
+                  human support.
                 </p>
               </div>
 
-              <form
-                onSubmit={handleCreateConversation}
-                className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto"
+              <button
+                type="button"
+                onClick={handleCreateConversation}
+                disabled={isCreating}
+                className="w-full shrink-0 rounded-xl bg-yellow px-6 py-3 font-bold text-dark-green transition hover:bg-yellow-hover disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(event) =>
-                    setTitle(event.target.value)
-                  }
-                  placeholder="e.g. Help with my order"
-                  className="min-w-0 flex-1 rounded-xl border border-white/15 bg-white px-4 py-3 text-text-primary outline-none sm:min-w-72"
-                />
-
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="rounded-xl bg-yellow px-5 py-3 font-bold text-dark-green transition hover:bg-yellow-hover disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isCreating
-                    ? "Creating..."
-                    : "Start conversation"}
-                </button>
-              </form>
+                {isCreating
+                  ? "Starting..."
+                  : "Start conversation"}
+              </button>
             </div>
           </section>
-
-          {message && (
-            <div className="mb-6 rounded-xl bg-light-green px-4 py-3 text-sm font-semibold text-dark-green">
-              {message}
-            </div>
-          )}
 
           {error && (
             <div className="mb-6 rounded-xl bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary">
@@ -254,8 +232,8 @@ export default function ConversationsPage() {
                 </h3>
 
                 <p className="mt-2 text-sm text-text-secondary">
-                  Start your first support conversation
-                  using the form above.
+                  Start your first AI support conversation
+                  using the button above.
                 </p>
               </div>
             )}
@@ -263,44 +241,46 @@ export default function ConversationsPage() {
           {!isLoading &&
             conversations.length > 0 && (
               <section className="space-y-4">
-                {conversations.map((conversation) => (
-                  <Link
-                    key={conversation.id}
-                    href={`/conversations/${conversation.id}`}
-                    className="block rounded-2xl border border-border-soft bg-white p-5 transition hover:border-dark-green sm:p-6"
-                  >
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="truncate text-lg font-bold text-text-primary">
-                            {conversation.title ||
-                              `Conversation #${conversation.id}`}
-                          </h3>
+                {conversations.map(
+                  (conversation) => (
+                    <Link
+                      key={conversation.id}
+                      href={`/conversations/${conversation.id}`}
+                      className="block rounded-2xl border border-border-soft bg-white p-5 transition hover:border-dark-green sm:p-6"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h3 className="truncate text-lg font-bold text-text-primary">
+                              {conversation.title ||
+                                `Conversation #${conversation.id}`}
+                            </h3>
 
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClasses(
-                              conversation.status,
-                            )}`}
-                          >
-                            {conversation.status}
-                          </span>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${getStatusClasses(
+                                conversation.status,
+                              )}`}
+                            >
+                              {conversation.status}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-sm text-text-secondary">
+                            Created{" "}
+                            {formatDate(
+                              conversation.created_at,
+                            )}
+                          </p>
                         </div>
 
-                        <p className="mt-2 text-sm text-text-secondary">
-                          Created{" "}
-                          {formatDate(
-                            conversation.created_at,
-                          )}
-                        </p>
+                        <div className="flex items-center gap-2 font-semibold text-dark-green">
+                          Open
+                          <span>→</span>
+                        </div>
                       </div>
-
-                      <div className="flex items-center gap-2 font-semibold text-dark-green">
-                        Open
-                        <span>→</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ),
+                )}
               </section>
             )}
         </div>

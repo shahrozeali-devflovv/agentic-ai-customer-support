@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import SupportHeader from "@/components/support-header";
 import SupportSidebar from "@/components/support-sidebar";
@@ -71,6 +77,9 @@ export default function SupportConversationPage() {
 
   const [error, setError] = useState("");
 
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     async function loadConversation() {
       if (!token || !conversationId) {
@@ -114,12 +123,17 @@ export default function SupportConversationPage() {
     loadConversation();
   }, [token, conversationId]);
 
-  async function handleReply(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [messages]);
 
-    if (!token || !reply.trim()) {
+  async function sendReply() {
+    const content = reply.trim();
+
+    if (!token || !content || isSending) {
       return;
     }
 
@@ -134,7 +148,7 @@ export default function SupportConversationPage() {
             method: "POST",
             token,
             body: JSON.stringify({
-              content: reply.trim(),
+              content,
             }),
           },
         );
@@ -151,6 +165,28 @@ export default function SupportConversationPage() {
       }
     } finally {
       setIsSending(false);
+    }
+  }
+
+  async function handleReply(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    await sendReply();
+  }
+
+  function handleReplyKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      if (!isSending && reply.trim()) {
+        void sendReply();
+      }
     }
   }
 
@@ -189,7 +225,7 @@ export default function SupportConversationPage() {
     senderType: MessageSenderType,
   ) {
     if (senderType === "support") {
-      return "ml-auto bg-dark-green text-white";
+      return "ml-auto bg-dark-green !text-white";
     }
 
     if (senderType === "ai") {
@@ -236,8 +272,8 @@ export default function SupportConversationPage() {
             </Link>
           </div>
 
-          {error && (
-            <div className="mb-4 rounded-xl bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary">
+          {error && !conversation && (
+            <div className="mb-4 rounded-xl bg-soft-yellow px-4 py-3 text-sm font-semibold text-dark-green">
               {error}
             </div>
           )}
@@ -252,15 +288,17 @@ export default function SupportConversationPage() {
 
           {!isDataLoading &&
             conversation && (
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-                <section className="overflow-hidden rounded-2xl border border-border-soft bg-white shadow-sm">
-                  <div className="border-b border-border-soft px-4 py-4 sm:px-5">
+              <div className="grid h-[calc(100dvh-155px)] min-h-[560px] gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+                {/* Chat */}
+                <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border-soft bg-white shadow-sm">
+                  {/* Conversation header */}
+                  <div className="shrink-0 border-b border-border-soft px-4 py-4 sm:px-5">
                     <p className="text-xs font-semibold uppercase tracking-[0.15em] text-dark-green">
                       Conversation #
                       {conversation.id}
                     </p>
 
-                    <h1 className="mt-1 text-xl font-bold text-text-primary sm:text-2xl">
+                    <h1 className="mt-1 text-xl font-bold text-dark-green sm:text-2xl">
                       {conversation.title}
                     </h1>
 
@@ -270,9 +308,10 @@ export default function SupportConversationPage() {
                     </p>
                   </div>
 
-                  <div className="max-h-[340px] min-h-[140px] space-y-4 overflow-y-auto bg-soft-white p-4 sm:p-5">
+                  {/* Scrollable messages */}
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-soft-white p-4 sm:p-5">
                     {messages.length === 0 && (
-                      <div className="flex min-h-[110px] items-center justify-center rounded-xl border border-dashed border-border-soft bg-white p-5 text-center">
+                      <div className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-border-soft bg-white p-5 text-center">
                         <p className="text-sm text-text-secondary">
                           No messages in this
                           conversation yet.
@@ -306,15 +345,28 @@ export default function SupportConversationPage() {
                         </p>
                       </div>
                     ))}
+
+                    <div
+                      ref={messagesEndRef}
+                      aria-hidden="true"
+                    />
                   </div>
 
+                  {/* Error inside chat */}
+                  {error && (
+                    <div className="shrink-0 border-t border-border-soft bg-soft-yellow px-4 py-3 text-sm font-semibold text-dark-green sm:px-5">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Reply box */}
                   <form
                     onSubmit={handleReply}
-                    className="border-t border-border-soft bg-white p-4 sm:p-5"
+                    className="shrink-0 border-t border-border-soft bg-white p-4 sm:p-5"
                   >
                     <label
                       htmlFor="support-reply"
-                      className="mb-2 block text-sm font-semibold text-text-primary"
+                      className="mb-2 block text-sm font-semibold text-dark-green"
                     >
                       Reply to customer
                     </label>
@@ -327,20 +379,28 @@ export default function SupportConversationPage() {
                           event.target.value,
                         )
                       }
-                      rows={3}
+                      onKeyDown={
+                        handleReplyKeyDown
+                      }
+                      rows={2}
                       placeholder="Type your reply..."
                       disabled={isSending}
-                      className="min-h-[90px] w-full resize-y rounded-xl border-2 border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-dark-green focus:ring-2 focus:ring-dark-green/10 disabled:cursor-not-allowed disabled:bg-gray-100"
+                      className="min-h-[72px] w-full resize-none rounded-xl border-2 border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-dark-green focus:ring-2 focus:ring-dark-green/10 disabled:cursor-not-allowed disabled:bg-gray-100"
                     />
 
-                    <div className="mt-3 flex justify-end">
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="hidden text-xs text-text-secondary sm:block">
+                        Enter to send · Shift +
+                        Enter for a new line
+                      </p>
+
                       <button
                         type="submit"
                         disabled={
                           isSending ||
                           !reply.trim()
                         }
-                        className="w-full rounded-xl bg-dark-green px-5 py-3 text-sm font-bold text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                        className="ml-auto w-full rounded-xl bg-dark-green px-5 py-3 text-sm font-bold !text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                       >
                         {isSending
                           ? "Sending..."
@@ -350,8 +410,9 @@ export default function SupportConversationPage() {
                   </form>
                 </section>
 
+                {/* Conversation details */}
                 <aside className="h-fit rounded-2xl border border-border-soft bg-white p-5 shadow-sm">
-                  <h2 className="text-lg font-bold text-text-primary">
+                  <h2 className="text-lg font-bold text-dark-green">
                     Conversation details
                   </h2>
 
@@ -383,7 +444,7 @@ export default function SupportConversationPage() {
                         Status
                       </p>
 
-                      <p className="mt-1 capitalize font-semibold text-text-primary">
+                      <p className="mt-1 font-semibold capitalize text-text-primary">
                         {conversation.status}
                       </p>
                     </div>

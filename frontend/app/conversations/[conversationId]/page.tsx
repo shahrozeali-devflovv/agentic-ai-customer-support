@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import {
-  FormEvent,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { useParams } from "next/navigation";
 
-import DashboardHeader from "@/components/dashboard-header";
-import DashboardSidebar from "@/components/dashboard-sidebar";
+import AdminHeader from "@/components/admin-header";
+import AdminSidebar from "@/components/admin-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/api";
 
@@ -34,27 +33,12 @@ type Message = {
     | "customer"
     | "ai"
     | "support";
+  sender_user_id: number | null;
   content: string;
   created_at: string;
 };
 
-type AgentOrder = {
-  order_number: string | null;
-  status: string | null;
-  total_amount: string | null;
-  currency: string | null;
-  placed_at: string | null;
-  estimated_delivery_at: string | null;
-  delivered_at: string | null;
-};
-
-type AgentMessageResponse = {
-  customer_message: Message;
-  ai_message: Message | null;
-  orders: AgentOrder[] | null;
-};
-
-export default function CustomerConversationPage() {
+export default function AdminConversationPage() {
   const params = useParams();
 
   const conversationId = String(
@@ -66,7 +50,7 @@ export default function CustomerConversationPage() {
     token,
     isLoading: isAuthLoading,
   } = useAuth({
-    allowedRoles: ["customer"],
+    allowedRoles: ["admin"],
   });
 
   const [isSidebarOpen, setIsSidebarOpen] =
@@ -79,17 +63,7 @@ export default function CustomerConversationPage() {
     Message[]
   >([]);
 
-  const [messageText, setMessageText] =
-    useState("");
-
-  const [orders, setOrders] = useState<
-    AgentOrder[]
-  >([]);
-
   const [isDataLoading, setIsDataLoading] =
-    useState(false);
-
-  const [isSending, setIsSending] =
     useState(false);
 
   const [error, setError] = useState("");
@@ -112,32 +86,25 @@ export default function CustomerConversationPage() {
           messageData,
         ] = await Promise.all([
           apiRequest<Conversation>(
-            `/conversations/${conversationId}`,
+            `/conversations/admin/${conversationId}`,
             {
               token,
             },
           ),
 
           apiRequest<Message[]>(
-            `/conversations/${conversationId}/messages`,
+            `/conversations/${conversationId}/messages/admin`,
             {
               token,
             },
           ),
         ]);
 
-        setConversation(
-          conversationData,
-        );
-
-        setMessages(
-          messageData,
-        );
+        setConversation(conversationData);
+        setMessages(messageData);
       } catch (error) {
         if (error instanceof Error) {
-          setError(
-            error.message,
-          );
+          setError(error.message);
         }
       } finally {
         setIsDataLoading(false);
@@ -151,143 +118,35 @@ export default function CustomerConversationPage() {
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages, orders]);
+  }, [messages]);
 
-  async function sendMessage(
-    content: string,
-  ) {
-    if (
-      !token ||
-      !content.trim() ||
-      isSending
-    ) {
-      return;
-    }
-
-    setIsSending(true);
-    setError("");
-
-    try {
-      const response =
-        await apiRequest<AgentMessageResponse>(
-          `/conversations/${conversationId}/messages`,
-          {
-            method: "POST",
-            token,
-            body: JSON.stringify({
-              content: content.trim(),
-            }),
-          },
-        );
-
-      setMessages(
-        (currentMessages) => {
-          const newMessages = [
-            ...currentMessages,
-            response.customer_message,
-          ];
-
-          if (response.ai_message) {
-            newMessages.push(
-              response.ai_message,
-            );
-          }
-
-          return newMessages;
-        },
-      );
-
-      setOrders(
-        response.orders ?? [],
-      );
-
-      setMessageText("");
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(
-          error.message,
-        );
-      }
-    } finally {
-      setIsSending(false);
-    }
-  }
-
-  async function handleSendMessage(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    await sendMessage(
-      messageText,
-    );
-  }
-
-  async function handleOrderSelect(
-    orderNumber: string,
-  ) {
-    await sendMessage(
-      `Tell me the details of order ${orderNumber}`,
-    );
-  }
-
-  function formatTime(
-    value: string,
-  ) {
+  function formatTime(value: string) {
     return new Date(
       value,
-    ).toLocaleTimeString(
-      "en-US",
-      {
-        hour: "numeric",
-        minute: "2-digit",
-      },
-    );
+    ).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
-  function formatDate(
-    value: string,
-  ) {
+  function formatDate(value: string) {
     return new Date(
       value,
-    ).toLocaleString(
-      "en-US",
-      {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      },
-    );
-  }
-
-  function formatOrderDate(
-    value: string | null,
-  ) {
-    if (!value) {
-      return null;
-    }
-
-    return new Date(
-      value,
-    ).toLocaleDateString(
-      "en-US",
-      {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      },
-    );
+    ).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   function getSenderLabel(
-    senderType:
-      Message["sender_type"],
+    senderType: Message["sender_type"],
   ) {
     switch (senderType) {
       case "customer":
-        return "You";
+        return "Customer";
 
       case "support":
         return "Support Agent";
@@ -296,7 +155,7 @@ export default function CustomerConversationPage() {
         return "AI Support";
 
       default:
-        return "Support";
+        return "Unknown";
     }
   }
 
@@ -318,34 +177,7 @@ export default function CustomerConversationPage() {
     }
   }
 
-  function getOrderStatusClasses(
-    status: string | null,
-  ) {
-    switch (status) {
-      case "delivered":
-        return "bg-light-green text-dark-green";
-
-      case "shipped":
-        return "bg-soft-yellow text-dark-green";
-
-      case "processing":
-        return "bg-blue-50 text-blue-700";
-
-      case "pending":
-        return "bg-gray-100 text-gray-700";
-
-      case "cancelled":
-        return "bg-red-50 text-red-700";
-
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  }
-
-  if (
-    isAuthLoading ||
-    !user
-  ) {
+  if (isAuthLoading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-soft-white">
         <p className="text-text-secondary">
@@ -357,7 +189,7 @@ export default function CustomerConversationPage() {
 
   return (
     <main className="min-h-screen bg-soft-white">
-      <DashboardSidebar
+      <AdminSidebar
         isOpen={isSidebarOpen}
         onClose={() =>
           setIsSidebarOpen(false)
@@ -365,20 +197,18 @@ export default function CustomerConversationPage() {
       />
 
       <div className="lg:ml-72">
-        <DashboardHeader
+        <AdminHeader
           onMenuClick={() =>
             setIsSidebarOpen(true)
           }
-          userName={
-            user.full_name
-          }
+          userName={user.full_name}
         />
 
         <div className="px-4 py-5 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-5xl">
             <div className="mb-5">
               <Link
-                href="/conversations"
+                href="/admin/conversations"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-dark-green transition hover:text-deep-green"
               >
                 <span>←</span>
@@ -406,8 +236,8 @@ export default function CustomerConversationPage() {
 
             {!isDataLoading &&
               conversation && (
-                <section className="overflow-hidden rounded-2xl border border-border-soft bg-white shadow-sm">
-                  <div className="border-b border-border-soft px-4 py-4 sm:px-6">
+                <section className="flex h-[calc(100dvh-190px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-border-soft bg-white shadow-sm">
+                  <div className="shrink-0 border-b border-border-soft px-4 py-4 sm:px-6">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-3">
@@ -421,17 +251,13 @@ export default function CustomerConversationPage() {
                               conversation.status,
                             )}`}
                           >
-                            {
-                              conversation.status
-                            }
+                            {conversation.status}
                           </span>
                         </div>
 
                         <p className="mt-2 text-sm text-text-secondary">
                           Conversation #
-                          {
-                            conversation.id
-                          }
+                          {conversation.id}
                         </p>
 
                         <p className="mt-1 text-xs text-text-secondary">
@@ -441,27 +267,29 @@ export default function CustomerConversationPage() {
                           )}
                         </p>
                       </div>
+
+                      <div className="rounded-xl bg-soft-yellow px-4 py-2 text-xs font-semibold text-dark-green">
+                        Admin view
+                      </div>
                     </div>
                   </div>
 
-                  <div className="max-h-[560px] min-h-[320px] overflow-y-auto bg-soft-white px-4 py-5 sm:px-6">
-                    {messages.length ===
-                    0 ? (
-                      <div className="flex min-h-[240px] items-center justify-center">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-soft-white px-4 py-5 sm:px-6">
+                    {messages.length === 0 ? (
+                      <div className="flex h-full min-h-[240px] items-center justify-center">
                         <div className="max-w-md text-center">
                           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow text-2xl">
                             💬
                           </div>
 
                           <h2 className="mt-4 text-lg font-bold text-text-primary">
-                            Start a conversation
+                            No messages yet
                           </h2>
 
                           <p className="mt-2 text-sm text-text-secondary">
-                            Ask about your
-                            orders, refunds,
-                            returns, or other
-                            support questions.
+                            This conversation does
+                            not contain any messages
+                            yet.
                           </p>
                         </div>
                       </div>
@@ -479,9 +307,7 @@ export default function CustomerConversationPage() {
 
                             return (
                               <div
-                                key={
-                                  message.id
-                                }
+                                key={message.id}
                                 className={`flex ${
                                   isCustomer
                                     ? "justify-end"
@@ -518,9 +344,7 @@ export default function CustomerConversationPage() {
                                           : "rounded-bl-md bg-soft-yellow text-text-primary"
                                     }`}
                                   >
-                                    {
-                                      message.content
-                                    }
+                                    {message.content}
                                   </div>
                                 </div>
                               </div>
@@ -528,193 +352,26 @@ export default function CustomerConversationPage() {
                           },
                         )}
 
-                        {orders.length >
-                          0 && (
-                          <div className="flex justify-start">
-                            <div className="w-full max-w-2xl">
-                              <p className="mb-2 text-xs font-semibold text-text-secondary">
-                                Your orders
-                              </p>
-
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                {orders.map(
-                                  (
-                                    order,
-                                  ) => {
-                                    if (
-                                      !order.order_number
-                                    ) {
-                                      return null;
-                                    }
-
-                                    return (
-                                      <button
-                                        key={
-                                          order.order_number
-                                        }
-                                        type="button"
-                                        disabled={
-                                          isSending
-                                        }
-                                        onClick={() =>
-                                          handleOrderSelect(
-                                            order.order_number as string,
-                                          )
-                                        }
-                                        className="rounded-2xl border border-border-soft bg-white p-4 text-left shadow-sm transition hover:border-dark-green hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                                      >
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div>
-                                            <p className="font-bold text-text-primary">
-                                              {
-                                                order.order_number
-                                              }
-                                            </p>
-
-                                            {order.total_amount &&
-                                              order.currency && (
-                                                <p className="mt-1 text-sm text-text-secondary">
-                                                  {
-                                                    order.currency
-                                                  }{" "}
-                                                  {
-                                                    order.total_amount
-                                                  }
-                                                </p>
-                                              )}
-                                          </div>
-
-                                          <span
-                                            className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${getOrderStatusClasses(
-                                              order.status,
-                                            )}`}
-                                          >
-                                            {order.status ||
-                                              "Unknown"}
-                                          </span>
-                                        </div>
-
-                                        <div className="mt-3 space-y-1 text-xs text-text-secondary">
-                                          {order.placed_at && (
-                                            <p>
-                                              Placed:{" "}
-                                              {formatOrderDate(
-                                                order.placed_at,
-                                              )}
-                                            </p>
-                                          )}
-
-                                          {order.estimated_delivery_at && (
-                                            <p>
-                                              Estimated
-                                              delivery:{" "}
-                                              {formatOrderDate(
-                                                order.estimated_delivery_at,
-                                              )}
-                                            </p>
-                                          )}
-
-                                          {order.delivered_at && (
-                                            <p>
-                                              Delivered:{" "}
-                                              {formatOrderDate(
-                                                order.delivered_at,
-                                              )}
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        <p className="mt-3 text-xs font-bold text-dark-green">
-                                          View order
-                                          details →
-                                        </p>
-                                      </button>
-                                    );
-                                  },
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {isSending && (
-                          <div className="flex justify-start">
-                            <div>
-                              <p className="mb-1 text-xs font-semibold text-text-secondary">
-                                AI Support
-                              </p>
-
-                              <div className="rounded-2xl rounded-bl-md border border-border-soft bg-white px-4 py-3 text-sm text-text-secondary">
-                                Thinking...
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
                         <div
-                          ref={
-                            messagesEndRef
-                          }
+                          ref={messagesEndRef}
                         />
                       </div>
                     )}
                   </div>
 
                   {error && (
-                    <div className="border-t border-border-soft bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary sm:px-6">
+                    <div className="shrink-0 border-t border-border-soft bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary sm:px-6">
                       {error}
                     </div>
                   )}
 
-                  <form
-                    onSubmit={
-                      handleSendMessage
-                    }
-                    className="border-t border-border-soft bg-white p-4 sm:p-5"
-                  >
-                    <label
-                      htmlFor="customer-message"
-                      className="mb-2 block text-sm font-semibold text-text-primary"
-                    >
-                      Send a message
-                    </label>
-
-                    <textarea
-                      id="customer-message"
-                      value={
-                        messageText
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        setMessageText(
-                          event.target
-                            .value,
-                        )
-                      }
-                      rows={3}
-                      placeholder="Ask about an order, refund, return, or another support question..."
-                      disabled={
-                        isSending
-                      }
-                      className="min-h-[90px] w-full resize-y rounded-xl border border-border-soft bg-white px-4 py-3 text-sm text-text-primary outline-none transition placeholder:text-text-secondary focus:border-dark-green focus:ring-2 focus:ring-dark-green/10 disabled:cursor-not-allowed disabled:bg-gray-100"
-                    />
-
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={
-                          isSending ||
-                          !messageText.trim()
-                        }
-                        className="w-full rounded-xl bg-dark-green px-5 py-3 text-sm font-bold text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                      >
-                        {isSending
-                          ? "AI is thinking..."
-                          : "Send message"}
-                      </button>
-                    </div>
-                  </form>
+                  <div className="shrink-0 border-t border-border-soft bg-white px-4 py-4 sm:px-6">
+                    <p className="text-center text-sm text-text-secondary">
+                      Admin view is read-only. Human
+                      responses are handled through
+                      assigned support escalations.
+                    </p>
+                  </div>
                 </section>
               )}
           </div>

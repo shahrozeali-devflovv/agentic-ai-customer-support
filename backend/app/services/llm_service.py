@@ -3,7 +3,7 @@ import os
 from groq import Groq
 
 
-LLM_MODEL = "qwen/qwen3.6-27b"
+LLM_MODEL = "qwen/qwen3.8-27b"
 
 
 def get_groq_client() -> Groq:

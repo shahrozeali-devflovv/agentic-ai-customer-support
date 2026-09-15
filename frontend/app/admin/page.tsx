@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import AdminHeader from "@/components/admin-header";
@@ -45,6 +46,7 @@ export default function AdminDashboardPage() {
     useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
+
   const [conversations, setConversations] =
     useState<Conversation[]>([]);
 
@@ -84,6 +86,10 @@ export default function AdminDashboardPage() {
       } catch (error) {
         if (error instanceof Error) {
           setError(error.message);
+        } else {
+          setError(
+            "Unable to load dashboard data.",
+          );
         }
       } finally {
         setIsDataLoading(false);
@@ -94,7 +100,7 @@ export default function AdminDashboardPage() {
   }, [token]);
 
   const activeUsers = users.filter(
-    (user) => user.is_active,
+    (item) => item.is_active,
   ).length;
 
   const activeConversations =
@@ -112,7 +118,7 @@ export default function AdminDashboardPage() {
   if (isAuthLoading || !user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-soft-white">
-        <p className="text-text-secondary">
+        <p className="text-dark-green">
           Checking authentication...
         </p>
       </main>
@@ -137,35 +143,41 @@ export default function AdminDashboardPage() {
         />
 
         <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {/* Page heading */}
           <section className="mb-8">
             <p className="text-sm font-semibold uppercase tracking-[0.15em] text-dark-green">
               Administration
             </p>
 
-            <h2 className="mt-2 text-2xl font-bold text-text-primary sm:text-3xl">
+            <h1 className="mt-2 text-2xl font-bold text-dark-green sm:text-3xl">
               Admin dashboard
-            </h2>
+            </h1>
 
             <p className="mt-2 max-w-2xl text-text-secondary">
-              Manage users, support conversations,
-              escalations, knowledge, and AI support
-              operations from one place.
+              Monitor customer support activity
+              and manage the main operations of
+              the support platform.
             </p>
           </section>
 
+          {/* Error */}
           {error && (
-            <div className="mb-6 rounded-xl bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary">
+            <div className="mb-6 rounded-xl bg-soft-yellow px-4 py-3 text-sm font-semibold text-dark-green">
               {error}
             </div>
           )}
 
+          {/* Summary cards */}
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-border-soft bg-white p-5">
-              <p className="text-sm text-text-secondary">
+            <Link
+              href="/admin/users"
+              className="rounded-2xl border border-border-soft bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-sm font-semibold text-dark-green">
                 Users
               </p>
 
-              <p className="mt-2 text-3xl font-bold text-text-primary">
+              <p className="mt-2 text-3xl font-bold text-dark-green">
                 {isDataLoading
                   ? "..."
                   : users.length}
@@ -175,14 +187,17 @@ export default function AdminDashboardPage() {
                 {activeUsers} active user
                 {activeUsers === 1 ? "" : "s"}
               </p>
-            </div>
+            </Link>
 
-            <div className="rounded-2xl border border-border-soft bg-white p-5">
-              <p className="text-sm text-text-secondary">
+            <Link
+              href="/admin/conversations"
+              className="rounded-2xl border border-border-soft bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-sm font-semibold text-dark-green">
                 Conversations
               </p>
 
-              <p className="mt-2 text-3xl font-bold text-text-primary">
+              <p className="mt-2 text-3xl font-bold text-dark-green">
                 {isDataLoading
                   ? "..."
                   : conversations.length}
@@ -195,80 +210,102 @@ export default function AdminDashboardPage() {
                   ? ""
                   : "s"}
               </p>
-            </div>
+            </Link>
 
-            <div className="rounded-2xl border border-border-soft bg-white p-5">
-              <p className="text-sm text-text-secondary">
+            <Link
+              href="/admin/escalations"
+              className="rounded-2xl border border-border-soft bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-sm font-semibold text-dark-green">
                 Escalations
               </p>
 
-              <p className="mt-2 text-3xl font-bold text-text-primary">
+              <p className="mt-2 text-3xl font-bold text-dark-green">
                 {isDataLoading
                   ? "..."
                   : escalatedConversations}
               </p>
 
               <p className="mt-2 text-xs text-text-secondary">
-                Based on conversations currently marked
-                as escalated.
+                Conversations currently marked
+                as escalated
               </p>
-            </div>
+            </Link>
 
-            <div className="rounded-2xl bg-dark-green p-5 text-white">
-              <p className="text-sm text-white/70">
+            <Link
+              href="/admin/knowledge-base"
+              className="rounded-2xl border border-dark-green bg-dark-green p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-sm font-semibold text-white">
                 Knowledge Base
               </p>
 
-              <p className="mt-2 text-3xl font-bold">
-                —
+              <p className="mt-2 text-xl font-bold text-white">
+                Manage knowledge
               </p>
 
-              <p className="mt-2 text-xs text-white/60">
-                Knowledge management will be connected
-                during the RAG phase.
+              <p className="mt-3 text-xs leading-5 text-white/80">
+                Upload and manage documents used
+                by the AI support agent.
               </p>
-            </div>
+            </Link>
           </section>
 
+          {/* Operations */}
           <section className="mt-8 grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-border-soft bg-white p-5 sm:p-6">
-              <h3 className="text-lg font-bold text-text-primary">
+              <h2 className="text-lg font-bold text-dark-green">
                 Support operations
-              </h3>
+              </h2>
 
               <p className="mt-2 text-sm leading-6 text-text-secondary">
-                Customer and conversation data is now
-                connected to the admin portal.
+                Review customer conversations and
+                manage cases that require human
+                support.
               </p>
 
-              <div className="mt-5 rounded-xl bg-soft-yellow p-4">
-                <p className="text-sm font-semibold text-dark-green">
-                  Core admin data connected
-                </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href="/admin/conversations"
+                  className="rounded-xl bg-dark-green px-4 py-2.5 text-sm font-semibold !text-white transition hover:bg-deep-green hover:!text-white"
+                >
+                  View conversations
+                </Link>
 
-                <p className="mt-1 text-sm text-text-secondary">
-                  Users and conversations now use real
-                  backend data. Escalation management will
-                  be implemented next.
-                </p>
+                <Link
+                  href="/admin/escalations"
+                  className="rounded-xl border border-dark-green bg-white px-4 py-2.5 text-sm font-semibold text-dark-green transition hover:bg-soft-white"
+                >
+                  View escalations
+                </Link>
               </div>
             </div>
 
             <div className="rounded-2xl border border-border-soft bg-white p-5 sm:p-6">
-              <h3 className="text-lg font-bold text-text-primary">
+              <h2 className="text-lg font-bold text-dark-green">
                 AI operations
-              </h3>
+              </h2>
 
               <p className="mt-2 text-sm leading-6 text-text-secondary">
-                Agent runs, tool calls, knowledge retrieval,
-                and AI activity will appear here after the
-                agentic AI backend is implemented.
+                Review agent activity, including
+                agent runs, intents, outcomes,
+                escalations, and tool usage.
               </p>
 
-              <div className="mt-5 rounded-xl bg-light-green p-4">
-                <p className="text-sm font-semibold text-dark-green">
-                  Coming in the AI phase
-                </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href="/admin/agent-activity"
+                  className="rounded-xl bg-dark-green px-4 py-2.5 text-sm font-semibold !text-white transition hover:bg-deep-green hover:!text-white"
+                >
+                  View agent activity
+                </Link>
+
+                <Link
+                  href="/admin/knowledge-base"
+                  className="rounded-xl border border-dark-green bg-white px-4 py-2.5 text-sm font-semibold text-dark-green transition hover:bg-soft-white"
+                >
+                  Manage knowledge
+                </Link>
               </div>
             </div>
           </section>

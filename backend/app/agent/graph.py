@@ -25,6 +25,9 @@ from app.services.agent_logging_service import (
 from app.services.escalation_service import (
     create_escalation,
 )
+from app.services.llm_service import (
+    generate_response,
+)
 from app.services.message_service import (
     get_recent_messages_for_conversation,
 )
@@ -133,23 +136,82 @@ def conversation_has_order_selection_context(
 
 def classify_node(
     state: AgentState,
+    db: Session,
 ) -> AgentState:
+    message = state["message"]
+
     selection_index = extract_order_selection_index(
-        state["message"]
+        message
     )
 
-    if selection_index is not None:
+    conversation_id = state.get(
+        "conversation_id"
+    )
+
+    if (
+        selection_index is not None
+        and conversation_id is not None
+        and conversation_has_order_selection_context(
+            db=db,
+            conversation_id=conversation_id,
+        )
+    ):
         return {
             "intent": Intent.ORDER,
         }
 
     intent = classify_intent(
-        state["message"]
+        message
     )
 
     return {
         "intent": intent,
     }
+
+
+def conversational_node(
+    state: AgentState,
+) -> AgentState:
+    prompt = f"""
+You are a friendly AI customer support assistant.
+
+The customer sent a conversational message that does not require
+database access or knowledge-base retrieval.
+
+Respond briefly and naturally.
+
+Rules:
+- Be friendly and professional.
+- Do not invent company policies.
+- Do not invent order information.
+- Do not invent account information.
+- Do not claim that you performed an action.
+- If the customer asks what you can help with, explain that you can
+  help with orders, account information, company policies, and
+  connecting them with human support.
+- Keep the response concise.
+
+Customer message:
+{state["message"]}
+""".strip()
+
+    try:
+        answer = generate_response(
+            prompt
+        )
+
+        return {
+            "answer": answer,
+            "needs_escalation": False,
+        }
+
+    except Exception:
+        return {
+            "answer": (
+                "Hello! How can I help you today?"
+            ),
+            "needs_escalation": False,
+        }
 
 
 def knowledge_node(
@@ -616,9 +678,13 @@ def fallback_node(
     state: AgentState,
 ) -> AgentState:
     return {
-        "answer": None,
+        "answer": (
+            "I’m not sure what you need help with. "
+            "I can assist with orders, account information, "
+            "company policies, or connect you with human support."
+        ),
         "has_context": False,
-        "needs_escalation": True,
+        "needs_escalation": False,
     }
 
 
@@ -748,6 +814,9 @@ def escalation_node(
 def route_by_intent(
     state: AgentState,
 ) -> str:
+    if state["intent"] == Intent.CONVERSATIONAL:
+        return "conversational"
+
     if state["intent"] == Intent.KNOWLEDGE:
         return "knowledge"
 
@@ -784,7 +853,15 @@ def build_agent_graph(
 
     graph.add_node(
         "classify",
-        classify_node,
+        lambda state: classify_node(
+            state,
+            db,
+        ),
+    )
+
+    graph.add_node(
+        "conversational",
+        conversational_node,
     )
 
     graph.add_node(
@@ -833,12 +910,18 @@ def build_agent_graph(
         "classify",
         route_by_intent,
         {
+            "conversational": "conversational",
             "knowledge": "knowledge",
             "order": "order",
             "account": "account",
             "escalation": "escalation",
             "fallback": "fallback",
         },
+    )
+
+    graph.add_edge(
+        "conversational",
+        END,
     )
 
     graph.add_conditional_edges(
@@ -870,7 +953,7 @@ def build_agent_graph(
 
     graph.add_edge(
         "fallback",
-        "escalation",
+        END,
     )
 
     graph.add_edge(

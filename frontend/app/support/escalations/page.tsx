@@ -231,7 +231,7 @@ export default function SupportEscalationsPage() {
 
                       <Link
                         href={`/support/conversations/${escalation.conversation_id}`}
-                        className="inline-flex w-full items-center justify-center rounded-xl bg-dark-green px-4 py-3 text-sm font-bold text-white transition hover:bg-deep-green sm:w-auto"
+                        className="inline-flex w-full items-center justify-center rounded-xl bg-dark-green px-4 py-3 text-sm font-bold !text-white transition hover:bg-deep-green sm:w-auto"
                       >
                         Open conversation
                       </Link>

@@ -1,11 +1,10 @@
 from enum import Enum
 
-from app.services.llm_service import (
-    generate_response,
-)
+from app.services.llm_service import generate_response
 
 
 class Intent(str, Enum):
+    CONVERSATIONAL = "conversational"
     KNOWLEDGE = "knowledge"
     ORDER = "order"
     ACCOUNT = "account"
@@ -24,30 +23,52 @@ def classify_intent(
         )
 
     prompt = f"""
-You are an intent classifier for a customer support system.
+You are an intent classifier for an AI customer support system.
 
-Classify the customer message into exactly one of these intents:
+Classify the customer message into exactly ONE intent.
+
+conversational
+- Greetings, thanks, goodbyes, acknowledgements, or simple casual
+  messages that do not require company or customer data.
+- Examples:
+  "hi"
+  "hello"
+  "thanks"
+  "okay"
+  "goodbye"
+  "who are you?"
+  "what can you help me with?"
 
 knowledge
 - Questions about company policies, refunds, returns, shipping rules,
   product information, FAQs, or other knowledge-base information.
 
 order
-- Questions about a specific order, delivery status, order history,
-  tracking, cancellation, or order details.
+- Questions about orders, delivery status, order history, tracking,
+  cancellation, or order details.
 
 account
 - Questions about the customer's own account, profile, email,
   personal information, password, or account settings.
 
 human_support
-- The customer explicitly asks to speak with a human,
-  support agent, representative, or person.
+- ONLY when the customer explicitly asks to speak with a human,
+  support agent, representative, or real person.
 
 unknown
-- The message does not clearly belong to any of the categories above.
+- The message does not clearly belong to any category above.
+- Do not classify something as human_support simply because the
+  request is unclear.
 
-Return only one intent value.
+Return ONLY one of these exact values:
+
+conversational
+knowledge
+order
+account
+human_support
+unknown
+
 Do not explain your answer.
 
 Customer message:

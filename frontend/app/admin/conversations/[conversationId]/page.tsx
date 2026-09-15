@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import {
-  FormEvent,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { useParams } from "next/navigation";
 
-import DashboardHeader from "@/components/dashboard-header";
-import DashboardSidebar from "@/components/dashboard-sidebar";
+import AdminHeader from "@/components/admin-header";
+import AdminSidebar from "@/components/admin-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/api";
 
@@ -30,13 +29,16 @@ type Conversation = {
 type Message = {
   id: number;
   conversation_id: number;
-  sender_type: "customer" | "ai" | "support";
+  sender_type:
+    | "customer"
+    | "ai"
+    | "support";
   sender_user_id: number | null;
   content: string;
   created_at: string;
 };
 
-export default function CustomerConversationPage() {
+export default function AdminConversationPage() {
   const params = useParams();
 
   const conversationId = String(
@@ -48,7 +50,7 @@ export default function CustomerConversationPage() {
     token,
     isLoading: isAuthLoading,
   } = useAuth({
-    allowedRoles: ["customer"],
+    allowedRoles: ["admin"],
   });
 
   const [isSidebarOpen, setIsSidebarOpen] =
@@ -61,13 +63,7 @@ export default function CustomerConversationPage() {
     Message[]
   >([]);
 
-  const [messageText, setMessageText] =
-    useState("");
-
   const [isDataLoading, setIsDataLoading] =
-    useState(false);
-
-  const [isSending, setIsSending] =
     useState(false);
 
   const [error, setError] = useState("");
@@ -90,14 +86,14 @@ export default function CustomerConversationPage() {
           messageData,
         ] = await Promise.all([
           apiRequest<Conversation>(
-            `/conversations/${conversationId}`,
+            `/conversations/admin/${conversationId}`,
             {
               token,
             },
           ),
 
           apiRequest<Message[]>(
-            `/conversations/${conversationId}/messages`,
+            `/conversations/${conversationId}/messages/admin`,
             {
               token,
             },
@@ -109,6 +105,10 @@ export default function CustomerConversationPage() {
       } catch (error) {
         if (error instanceof Error) {
           setError(error.message);
+        } else {
+          setError(
+            "Unable to load conversation.",
+          );
         }
       } finally {
         setIsDataLoading(false);
@@ -124,69 +124,25 @@ export default function CustomerConversationPage() {
     });
   }, [messages]);
 
-  async function handleSendMessage(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    const content = messageText.trim();
-
-    if (!token || !content) {
-      return;
-    }
-
-    setIsSending(true);
-    setError("");
-
-    try {
-      const newMessage =
-        await apiRequest<Message>(
-          `/conversations/${conversationId}/messages`,
-          {
-            method: "POST",
-            token,
-            body: JSON.stringify({
-              content,
-            }),
-          },
-        );
-
-      setMessages((current) => [
-        ...current,
-        newMessage,
-      ]);
-
-      setMessageText("");
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      }
-    } finally {
-      setIsSending(false);
-    }
-  }
-
   function formatTime(value: string) {
-    return new Date(value).toLocaleTimeString(
-      "en-US",
-      {
-        hour: "numeric",
-        minute: "2-digit",
-      },
-    );
+    return new Date(
+      value,
+    ).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   function formatDate(value: string) {
-    return new Date(value).toLocaleString(
-      "en-US",
-      {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      },
-    );
+    return new Date(
+      value,
+    ).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   function getSenderLabel(
@@ -194,7 +150,7 @@ export default function CustomerConversationPage() {
   ) {
     switch (senderType) {
       case "customer":
-        return "You";
+        return "Customer";
 
       case "support":
         return "Support Agent";
@@ -203,7 +159,7 @@ export default function CustomerConversationPage() {
         return "AI Support";
 
       default:
-        return "Support";
+        return "Unknown";
     }
   }
 
@@ -237,7 +193,7 @@ export default function CustomerConversationPage() {
 
   return (
     <main className="min-h-screen bg-soft-white">
-      <DashboardSidebar
+      <AdminSidebar
         isOpen={isSidebarOpen}
         onClose={() =>
           setIsSidebarOpen(false)
@@ -245,7 +201,7 @@ export default function CustomerConversationPage() {
       />
 
       <div className="lg:ml-72">
-        <DashboardHeader
+        <AdminHeader
           onMenuClick={() =>
             setIsSidebarOpen(true)
           }
@@ -256,7 +212,7 @@ export default function CustomerConversationPage() {
           <div className="mx-auto w-full max-w-5xl">
             <div className="mb-5">
               <Link
-                href="/conversations"
+                href="/admin/conversations"
                 className="inline-flex items-center gap-2 text-sm font-semibold text-dark-green transition hover:text-deep-green"
               >
                 <span>←</span>
@@ -284,8 +240,8 @@ export default function CustomerConversationPage() {
 
             {!isDataLoading &&
               conversation && (
-                <section className="overflow-hidden rounded-2xl border border-border-soft bg-white shadow-sm">
-                  <div className="border-b border-border-soft px-4 py-4 sm:px-6">
+                <section className="flex h-[calc(100dvh-190px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border border-border-soft bg-white shadow-sm">
+                  <div className="shrink-0 border-b border-border-soft px-4 py-4 sm:px-6">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-3">
@@ -299,7 +255,9 @@ export default function CustomerConversationPage() {
                               conversation.status,
                             )}`}
                           >
-                            {conversation.status}
+                            {
+                              conversation.status
+                            }
                           </span>
                         </div>
 
@@ -315,12 +273,16 @@ export default function CustomerConversationPage() {
                           )}
                         </p>
                       </div>
+
+                      <div className="rounded-xl bg-soft-yellow px-4 py-2 text-xs font-semibold text-dark-green">
+                        Admin view
+                      </div>
                     </div>
                   </div>
 
-                  <div className="max-h-[470px] min-h-[280px] overflow-y-auto bg-soft-white px-4 py-5 sm:px-6">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-soft-white px-4 py-5 sm:px-6">
                     {messages.length === 0 ? (
-                      <div className="flex min-h-[240px] items-center justify-center">
+                      <div className="flex h-full min-h-[240px] items-center justify-center">
                         <div className="max-w-md text-center">
                           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow text-2xl">
                             💬
@@ -331,8 +293,9 @@ export default function CustomerConversationPage() {
                           </h2>
 
                           <p className="mt-2 text-sm text-text-secondary">
-                            Send your first message
-                            below.
+                            This conversation does
+                            not contain any messages
+                            yet.
                           </p>
                         </div>
                       </div>
@@ -387,7 +350,9 @@ export default function CustomerConversationPage() {
                                           : "rounded-bl-md bg-soft-yellow text-text-primary"
                                     }`}
                                   >
-                                    {message.content}
+                                    {
+                                      message.content
+                                    }
                                   </div>
                                 </div>
                               </div>
@@ -403,51 +368,19 @@ export default function CustomerConversationPage() {
                   </div>
 
                   {error && (
-                    <div className="border-t border-border-soft bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary sm:px-6">
+                    <div className="shrink-0 border-t border-border-soft bg-soft-yellow px-4 py-3 text-sm font-semibold text-text-primary sm:px-6">
                       {error}
                     </div>
                   )}
 
-                  <form
-                    onSubmit={handleSendMessage}
-                    className="border-t border-border-soft bg-white p-4 sm:p-5"
-                  >
-                    <label
-                      htmlFor="customer-message"
-                      className="mb-2 block text-sm font-semibold text-text-primary"
-                    >
-                      Send a message
-                    </label>
-
-                    <textarea
-                      id="customer-message"
-                      value={messageText}
-                      onChange={(event) =>
-                        setMessageText(
-                          event.target.value,
-                        )
-                      }
-                      rows={3}
-                      placeholder="Type your message..."
-                      disabled={isSending}
-                      className="min-h-[90px] w-full resize-y rounded-xl border border-border-soft bg-white px-4 py-3 text-sm text-text-primary outline-none transition placeholder:text-text-secondary focus:border-dark-green focus:ring-2 focus:ring-dark-green/10 disabled:cursor-not-allowed disabled:bg-gray-100"
-                    />
-
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="submit"
-                        disabled={
-                          isSending ||
-                          !messageText.trim()
-                        }
-                        className="w-full rounded-xl bg-dark-green px-5 py-3 text-sm font-bold text-white transition hover:bg-deep-green disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                      >
-                        {isSending
-                          ? "Sending..."
-                          : "Send message"}
-                      </button>
-                    </div>
-                  </form>
+                  <div className="shrink-0 border-t border-border-soft bg-white px-4 py-4 sm:px-6">
+                    <p className="text-center text-sm text-text-secondary">
+                      Admin view is read-only.
+                      Support agents handle
+                      escalated customer
+                      conversations.
+                    </p>
+                  </div>
                 </section>
               )}
           </div>
